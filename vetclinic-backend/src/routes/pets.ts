@@ -1,4 +1,5 @@
 import { logAudit } from "../utils/audit";
+import { getPaginationParams, paginatedResponse, searchFilter } from "../utils/pagination";
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
@@ -15,8 +16,20 @@ export default async function petsRoutes(fastify: FastifyInstance) {
 
   fastify.get("/pets", async (request, reply) => {
     const { userId } = request.user;
-    const pets = await fastify.prisma.pet.findMany({ where: { ownerId: userId } });
-    return reply.send({ pets });
+    const query = request.query as { page?: string; limit?: string; search?: string };
+    const { page, limit, skip } = getPaginationParams(query);
+
+    const where = {
+      ownerId: userId,
+      ...searchFilter(query.search, ["name", "breed"]),
+    };
+
+    const [pets, total] = await Promise.all([
+      fastify.prisma.pet.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" } }),
+      fastify.prisma.pet.count({ where }),
+    ]);
+
+    return reply.send(paginatedResponse(pets, total, page, limit));
   });
 
   fastify.post("/pets", async (request, reply) => {

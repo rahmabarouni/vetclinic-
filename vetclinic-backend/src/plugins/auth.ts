@@ -20,11 +20,22 @@ export default fp(async (fastify: FastifyInstance) => {
       reply.code(401).send({ error: "Non authentifié." });
     }
   });
+
+  fastify.decorate("authorize", (roles: UserRole[]) => {
+    return async (request: FastifyRequest, reply: FastifyReply) => {
+      const currentUserRole = request.user?.role;
+
+      if (!currentUserRole || !roles.includes(currentUserRole)) {
+        return reply.code(403).send({ error: "Accès refusé." });
+      }
+    };
+  });
 });
 
 declare module "fastify" {
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    authorize: (roles: UserRole[]) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 

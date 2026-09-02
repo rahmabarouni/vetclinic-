@@ -15,17 +15,316 @@ enum UserRole {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  phone        String?
-  role         UserRole @default(CLIENT)
-  firstName    String   @map("first_name")
-  lastName     String   @map("last_name")
-  address      String?
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                  String         @id @default(uuid())
+  email               String         @unique
+  passwordHash        String         @map("password_hash")
+  phone               String?
+  role                UserRole       @default(CLIENT)
+  firstName           String         @map("first_name")
+  lastName            String         @map("last_name")
+  address             String?
+  isActive            Boolean        @default(true) @map("is_active")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+  pets                Pet[]
+  veterinarian        Veterinarian?
+  clientAppointments  Appointment[]  @relation("ClientAppointments")
+  clientConversations Conversation[] @relation("ClientConversations")
+  sentMessages        Message[]      @relation("MessageSender")
+  documents           Document[]     @relation("DocumentUploader")
+  notifications       Notification[] @relation("NotificationRecipient")
+  auditLogs           AuditLog[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
+}
+
+model Veterinarian {
+  id                    String          @id @default(uuid())
+  userId                String          @unique @map("user_id")
+  specialty             String
+  bio                   String?
+  isAvailableForBooking Boolean         @default(true) @map("is_available_for_booking")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+  appointments          Appointment[]   @relation("VeterinarianAppointments")
+  timeSlotBlocks        TimeSlotBlock[]
+  medicalRecords        MedicalRecord[]
+  conversations         Conversation[]  @relation("VeterinarianConversations")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("veterinarians")
+}
+
+enum AppointmentType {
+  CONSULTATION
+  VACCINATION
+  SURGERY
+  EMERGENCY
+  CHECKUP
+  GROOMING
+  OTHER
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum MedicalRecordType {
+  CONSULTATION
+  VACCINATION
+  SURGERY
+  TREATMENT
+  ALLERGY
+  OTHER
+}
+
+enum ReminderType {
+  VACCINE
+  TREATMENT
+  CHECKUP
+  OTHER
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+enum AttachmentType {
+  IMAGE
+  DOCUMENT
+}
+
+enum DocumentType {
+  XRAY
+  LAB_RESULT
+  PRESCRIPTION
+  PHOTO
+  OTHER
+}
+
+enum NotificationType {
+  APPOINTMENT
+  MESSAGE
+  REMINDER
+  DOCUMENT
+  SYSTEM
+}
+
+model TimeSlotBlock {
+  id             String   @id @default(uuid())
+  veterinarianId String   @map("veterinarian_id")
+  startDatetime  DateTime @map("start_datetime")
+  endDatetime    DateTime @map("end_datetime")
+  reason         String?
+  isRecurring    Boolean  @default(false) @map("is_recurring")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  veterinarian Veterinarian @relation(fields: [veterinarianId], references: [id], onDelete: Cascade)
+
+  @@map("time_slot_blocks")
+}
+
+model MedicalRecord {
+  id             String            @id @default(uuid())
+  petId          String            @map("pet_id")
+  appointmentId  String?           @unique @map("appointment_id")
+  veterinarianId String            @map("veterinarian_id")
+  recordType     MedicalRecordType @map("record_type")
+  title          String
+  description    String?
+  diagnosis      String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  pet          Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  appointment  Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  veterinarian Veterinarian @relation(fields: [veterinarianId], references: [id], onDelete: Cascade)
+  reminders    Reminder[]
+  documents    Document[]
+
+  @@map("medical_records")
+}
+
+model Reminder {
+  id              String       @id @default(uuid())
+  petId           String       @map("pet_id")
+  medicalRecordId String?      @map("medical_record_id")
+  reminderType    ReminderType @map("reminder_type")
+  title           String
+  dueDate         DateTime     @map("due_date")
+  notifiedAt      DateTime?    @map("notified_at")
+  isCompleted     Boolean      @default(false) @map("is_completed")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  pet           Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  medicalRecord MedicalRecord? @relation(fields: [medicalRecordId], references: [id], onDelete: SetNull)
+
+  @@map("reminders")
+}
+
+model Conversation {
+  id             String             @id @default(uuid())
+  clientId       String             @map("client_id")
+  veterinarianId String?            @map("veterinarian_id")
+  status         ConversationStatus @default(OPEN)
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  client       User          @relation("ClientConversations", fields: [clientId], references: [id], onDelete: Cascade)
+  veterinarian Veterinarian? @relation("VeterinarianConversations", fields: [veterinarianId], references: [id], onDelete: SetNull)
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String          @id @default(uuid())
+  conversationId String          @map("conversation_id")
+  senderId       String          @map("sender_id")
+  content        String?
+  attachmentUrl  String?         @map("attachment_url")
+  attachmentType AttachmentType? @map("attachment_type")
+  isRead         Boolean         @default(false) @map("is_read")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Appointment {
+  id                 String            @id @default(uuid())
+  petId              String            @map("pet_id")
+  clientId           String            @map("client_id")
+  veterinarianId     String?           @map("veterinarian_id")
+  appointmentType    AppointmentType   @map("appointment_type")
+  status             AppointmentStatus @default(PENDING)
+  scheduledStart     DateTime          @map("scheduled_start")
+  scheduledEnd       DateTime          @map("scheduled_end")
+  reason             String?
+  cancellationReason String?           @map("cancellation_reason")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  pet           Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  client        User           @relation("ClientAppointments", fields: [clientId], references: [id], onDelete: Cascade)
+  veterinarian  Veterinarian?  @relation("VeterinarianAppointments", fields: [veterinarianId], references: [id], onDelete: SetNull)
+  medicalRecord MedicalRecord?
+
+  @@map("appointments")
+}
+
+enum PetSpecies {
+  DOG
+  CAT
+  BIRD
+  RABBIT
+  RODENT
+  REPTILE
+  OTHER
+}
+
+enum PetSex {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+model Pet {
+  id             String          @id @default(uuid())
+  ownerId        String          @map("owner_id")
+  name           String
+  species        PetSpecies
+  breed          String?
+  birthDate      DateTime?       @map("birth_date")
+  sex            PetSex          @default(UNKNOWN)
+  weightKg       Float?          @map("weight_kg")
+  photoUrl       String?         @map("photo_url")
+  isActive       Boolean         @default(true) @map("is_active")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
+  reminders      Reminder[]
+  documents      Document[]
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@map("pets")
+}
+
+model Document {
+  id              String       @id @default(uuid())
+  petId           String       @map("pet_id")
+  medicalRecordId String?      @map("medical_record_id")
+  uploadedBy      String       @map("uploaded_by")
+  fileUrl         String       @map("file_url")
+  fileType        DocumentType @map("file_type")
+  title           String
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  pet           Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  medicalRecord MedicalRecord? @relation(fields: [medicalRecordId], references: [id], onDelete: SetNull)
+  uploader      User           @relation("DocumentUploader", fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  recipientId String           @map("recipient_id")
+  type        NotificationType
+  title       String
+  message     String
+  isRead      Boolean          @default(false) @map("is_read")
+  readAt      DateTime?        @map("read_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  recipient User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("password_reset_tokens")
 }

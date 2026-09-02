@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { AppointmentStatus, AppointmentType } from "@prisma/client";
 import { z } from "zod";
+import { getPaginationParams, paginatedResponse, searchFilter } from "../utils/pagination";
 
 const appointmentTypeValues = ["CONSULTATION", "VACCINATION", "SURGERY", "EMERGENCY", "CHECKUP", "GROOMING", "OTHER"] as const;
 const appointmentStatusValues = ["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED", "NO_SHOW"] as const;
@@ -191,42 +192,39 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
 
   fastify.get("/appointments", async (request, reply) => {
     const { userId, role } = request.user;
+    const query = request.query as { page?: string; limit?: string; search?: string };
+    const { page, limit, skip } = getPaginationParams(query);
+
+    const searchWhere = searchFilter(query.search, ["reason"]);
 
     if (role === "CLIENT") {
-      const appointments = await fastify.prisma.appointment.findMany({
-        where: { clientId: userId },
-        orderBy: { scheduledStart: "asc" },
-        select: appointmentSelect,
-      });
-
-      return reply.send({ appointments });
+      const where = { clientId: userId, ...searchWhere };
+      const [appointments, total] = await Promise.all([
+        fastify.prisma.appointment.findMany({ where, skip, take: limit, orderBy: { scheduledStart: "asc" }, select: appointmentSelect }),
+        fastify.prisma.appointment.count({ where }),
+      ]);
+      return reply.send(paginatedResponse(appointments, total, page, limit));
     }
 
     if (role === "VETERINARIAN") {
-      const veterinarian = await fastify.prisma.veterinarian.findUnique({
-        where: { userId },
-        select: { id: true },
-      });
-
+      const veterinarian = await fastify.prisma.veterinarian.findUnique({ where: { userId }, select: { id: true } });
       if (!veterinarian) {
         return reply.code(404).send({ error: "Profil vétérinaire introuvable." });
       }
-
-      const appointments = await fastify.prisma.appointment.findMany({
-        where: { veterinarianId: veterinarian.id },
-        orderBy: { scheduledStart: "asc" },
-        select: appointmentSelect,
-      });
-
-      return reply.send({ appointments });
+      const where = { veterinarianId: veterinarian.id, ...searchWhere };
+      const [appointments, total] = await Promise.all([
+        fastify.prisma.appointment.findMany({ where, skip, take: limit, orderBy: { scheduledStart: "asc" }, select: appointmentSelect }),
+        fastify.prisma.appointment.count({ where }),
+      ]);
+      return reply.send(paginatedResponse(appointments, total, page, limit));
     }
 
-    const appointments = await fastify.prisma.appointment.findMany({
-      orderBy: { scheduledStart: "asc" },
-      select: appointmentSelect,
-    });
-
-    return reply.send({ appointments });
+    const where = { ...searchWhere };
+    const [appointments, total] = await Promise.all([
+      fastify.prisma.appointment.findMany({ where, skip, take: limit, orderBy: { scheduledStart: "asc" }, select: appointmentSelect }),
+      fastify.prisma.appointment.count({ where }),
+    ]);
+    return reply.send(paginatedResponse(appointments, total, page, limit));
   });
 
   fastify.patch(

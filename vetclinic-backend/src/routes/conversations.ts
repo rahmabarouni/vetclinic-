@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { getPaginationParams, paginatedResponse, searchFilter } from "../utils/pagination";
 
 const createConversationSchema = z.object({
   veterinarianId: z.string().uuid().nullable().optional(),
@@ -191,42 +192,37 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
 
   fastify.get("/conversations", async (request, reply) => {
     const { userId, role } = request.user;
+    const query = request.query as { page?: string; limit?: string };
+    const { page, limit, skip } = getPaginationParams(query);
 
     if (role === "CLIENT") {
-      const conversations = await fastify.prisma.conversation.findMany({
-        where: { clientId: userId },
-        orderBy: { updatedAt: "desc" },
-        select: conversationSelect,
-      });
-
-      return reply.send({ conversations });
+      const where = { clientId: userId };
+      const [conversations, total] = await Promise.all([
+        fastify.prisma.conversation.findMany({ where, skip, take: limit, orderBy: { updatedAt: "desc" }, select: conversationSelect }),
+        fastify.prisma.conversation.count({ where }),
+      ]);
+      return reply.send(paginatedResponse(conversations, total, page, limit));
     }
 
     if (role === "VETERINARIAN") {
-      const veterinarian = await fastify.prisma.veterinarian.findUnique({
-        where: { userId },
-        select: { id: true },
-      });
-
+      const veterinarian = await fastify.prisma.veterinarian.findUnique({ where: { userId }, select: { id: true } });
       if (!veterinarian) {
         return reply.code(404).send({ error: "Profil vétérinaire introuvable." });
       }
-
-      const conversations = await fastify.prisma.conversation.findMany({
-        where: { veterinarianId: veterinarian.id },
-        orderBy: { updatedAt: "desc" },
-        select: conversationSelect,
-      });
-
-      return reply.send({ conversations });
+      const where = { veterinarianId: veterinarian.id };
+      const [conversations, total] = await Promise.all([
+        fastify.prisma.conversation.findMany({ where, skip, take: limit, orderBy: { updatedAt: "desc" }, select: conversationSelect }),
+        fastify.prisma.conversation.count({ where }),
+      ]);
+      return reply.send(paginatedResponse(conversations, total, page, limit));
     }
 
-    const conversations = await fastify.prisma.conversation.findMany({
-      orderBy: { updatedAt: "desc" },
-      select: conversationSelect,
-    });
-
-    return reply.send({ conversations });
+    const where = {};
+    const [conversations, total] = await Promise.all([
+      fastify.prisma.conversation.findMany({ where, skip, take: limit, orderBy: { updatedAt: "desc" }, select: conversationSelect }),
+      fastify.prisma.conversation.count({ where }),
+    ]);
+    return reply.send(paginatedResponse(conversations, total, page, limit));
   });
 
   fastify.get("/conversations/:id/messages", async (request, reply) => {
@@ -246,13 +242,21 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
       return reply.code(403).send({ error: "Accès refusé." });
     }
 
-    const messages = await fastify.prisma.message.findMany({
-      where: { conversationId: conversation.id },
-      orderBy: { createdAt: "asc" },
-      select: messageSelect,
-    });
+    const msgQuery = request.query as { page?: string; limit?: string };
+    const msgPagination = getPaginationParams(msgQuery);
 
-    return reply.send({ conversation, messages });
+    const [messages, msgTotal] = await Promise.all([
+      fastify.prisma.message.findMany({
+        where: { conversationId: conversation.id },
+        skip: msgPagination.skip,
+        take: msgPagination.limit,
+        orderBy: { createdAt: "asc" },
+        select: messageSelect,
+      }),
+      fastify.prisma.message.count({ where: { conversationId: conversation.id } }),
+    ]);
+
+    return reply.send({ conversation, ...paginatedResponse(messages, msgTotal, msgPagination.page, msgPagination.limit) });
   });
 
   fastify.post("/conversations/:id/messages", async (request, reply) => {

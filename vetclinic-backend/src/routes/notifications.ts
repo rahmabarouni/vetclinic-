@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { getPaginationParams, paginatedResponse } from "../utils/pagination";
 
 const notificationSelect = {
   id: true,
@@ -11,15 +12,6 @@ const notificationSelect = {
   readAt: true,
   createdAt: true,
   updatedAt: true,
-  recipient: {
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      role: true,
-    },
-  },
 } as const;
 
 export default async function notificationsRoutes(fastify: FastifyInstance) {
@@ -27,14 +19,27 @@ export default async function notificationsRoutes(fastify: FastifyInstance) {
 
   fastify.get("/notifications", async (request, reply) => {
     const { userId, role } = request.user;
+    const query = request.query as { page?: string; limit?: string };
+    const { page, limit, skip } = getPaginationParams(query);
 
-    const notifications = await fastify.prisma.notification.findMany({
-      where: role === "ADMIN" || role === "STAFF" ? undefined : { recipientId: userId },
-      orderBy: { createdAt: "desc" },
-      select: notificationSelect,
-    });
+    const where = role === "ADMIN" || role === "STAFF" ? undefined : { recipientId: userId };
 
-    return reply.send({ notifications });
+    const [notifications, total] = await Promise.all([
+      fastify.prisma.notification.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" }, select: notificationSelect }),
+      fastify.prisma.notification.count({ where }),
+    ]);
+
+    return reply.send(paginatedResponse(notifications, total, page, limit));
+  });
+
+  fastify.get("/notifications/unread-count", async (request, reply) => {
+    const { userId, role } = request.user;
+    const where = role === "ADMIN" || role === "STAFF"
+      ? { isRead: false }
+      : { recipientId: userId, isRead: false };
+
+    const count = await fastify.prisma.notification.count({ where });
+    return reply.send({ count });
   });
 
   fastify.patch("/notifications/:id/read", async (request, reply) => {
@@ -67,5 +72,19 @@ export default async function notificationsRoutes(fastify: FastifyInstance) {
     });
 
     return reply.send({ notification: updatedNotification });
+  });
+
+  fastify.patch("/notifications/read-all", async (request, reply) => {
+    const { userId, role } = request.user;
+    const where = role === "ADMIN" || role === "STAFF"
+      ? { isRead: false }
+      : { recipientId: userId, isRead: false };
+
+    const result = await fastify.prisma.notification.updateMany({
+      where,
+      data: { isRead: true, readAt: new Date() },
+    });
+
+    return reply.send({ updated: result.count });
   });
 }

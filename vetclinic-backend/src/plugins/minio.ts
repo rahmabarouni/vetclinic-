@@ -1,6 +1,7 @@
 import fp from "fastify-plugin";
 import { FastifyInstance } from "fastify";
-import { S3Client, PutObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadBucketCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -21,6 +22,7 @@ export interface MinioPlugin {
     buffer: Buffer,
     contentType: string,
   ) => Promise<{ key: string; url: string }>;
+  getPresignedUrl: (key: string, expiresIn?: number) => Promise<string>;
 }
 
 async function ensureBucket(s3: S3Client, bucket: string): Promise<void> {
@@ -66,6 +68,10 @@ export default fp(async (fastify: FastifyInstance) => {
         key,
         url: `${endpoint}/${BUCKET_NAME}/${key}`,
       };
+    },
+    getPresignedUrl: async (key: string, expiresIn: number = 3600) => {
+      const command = new GetObjectCommand({ Bucket: BUCKET_NAME, Key: key });
+      return getSignedUrl(s3, command, { expiresIn });
     },
   } as MinioPlugin);
 
