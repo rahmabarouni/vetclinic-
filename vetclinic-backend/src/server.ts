@@ -24,7 +24,25 @@ import dashboardRoutes from "./routes/dashboard";
 import passwordResetRoutes from "./routes/password-reset";
 import downloadsRoutes from "./routes/downloads";
 import activityRoutes from "./routes/activity";
+import usersRoutes from "./routes/users";
+import searchRoutes from "./routes/search";
 import { startReminderCron } from "./cron/reminders";
+
+function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  return `${m}m ${s}s`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
 
 async function start() {
   const fastify = Fastify({ logger: true });
@@ -71,10 +89,51 @@ async function start() {
   await fastify.register(passwordResetRoutes, { prefix: "/api/v1" });
   await fastify.register(downloadsRoutes, { prefix: "/api/v1" });
   await fastify.register(activityRoutes, { prefix: "/api/v1" });
+  await fastify.register(usersRoutes, { prefix: "/api/v1" });
+  await fastify.register(searchRoutes, { prefix: "/api/v1" });
 
   startReminderCron(fastify.prisma);
 
-  fastify.get("/health", async () => ({ status: "ok" }));
+  const startTime = Date.now();
+
+  fastify.get("/health", async (_request, reply) => {
+    const checks: Record<string, { status: string; latencyMs?: number }> = {};
+
+    // Database check
+    const dbStart = Date.now();
+    try {
+      await fastify.prisma.$queryRaw`SELECT 1`;
+      checks.database = { status: "ok", latencyMs: Date.now() - dbStart };
+    } catch {
+      checks.database = { status: "error", latencyMs: Date.now() - dbStart };
+    }
+
+    // MinIO check
+    const minioStart = Date.now();
+    try {
+      const { HeadBucketCommand } = await import("@aws-sdk/client-s3");
+      await fastify.minio.s3.send(new HeadBucketCommand({ Bucket: fastify.minio.bucket }));
+      checks.minio = { status: "ok", latencyMs: Date.now() - minioStart };
+    } catch {
+      checks.minio = { status: "error", latencyMs: Date.now() - minioStart };
+    }
+
+    const mem = process.memoryUsage();
+    const allOk = Object.values(checks).every((c) => c.status === "ok");
+
+    return reply.code(allOk ? 200 : 503).send({
+      status: allOk ? "ok" : "degraded",
+      uptime: Math.floor(process.uptime()),
+      uptimeHuman: formatUptime(process.uptime()),
+      memory: {
+        rss: formatBytes(mem.rss),
+        heapUsed: formatBytes(mem.heapUsed),
+        heapTotal: formatBytes(mem.heapTotal),
+        external: formatBytes(mem.external),
+      },
+      checks,
+    });
+  });
 
   await fastify.listen({ port: 3000, host: "0.0.0.0" });
   console.log("🐾 Serveur démarré sur http://localhost:3000");

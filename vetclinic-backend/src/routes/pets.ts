@@ -11,16 +11,25 @@ const createPetSchema = z.object({
   weightKg: z.number().positive().optional(),
 });
 
+const updatePetSchema = z.object({
+  name: z.string().min(1).optional(),
+  species: z.enum(["DOG", "CAT", "BIRD", "RABBIT", "RODENT", "REPTILE", "OTHER"]).optional(),
+  breed: z.string().optional(),
+  sex: z.enum(["MALE", "FEMALE", "UNKNOWN"]).optional(),
+  weightKg: z.number().positive().optional(),
+});
+
 export default async function petsRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
 
   fastify.get("/pets", async (request, reply) => {
-    const { userId } = request.user;
+    const { userId, role } = request.user;
     const query = request.query as { page?: string; limit?: string; search?: string };
     const { page, limit, skip } = getPaginationParams(query);
 
     const where = {
-      ownerId: userId,
+      ...(role === "CLIENT" ? { ownerId: userId } : {}),
+      isActive: true,
       ...searchFilter(query.search, ["name", "breed"]),
     };
 
@@ -44,6 +53,82 @@ export default async function petsRoutes(fastify: FastifyInstance) {
     });
 
     return reply.code(201).send({ pet });
+  });
+
+  fastify.patch("/pets/:id", async (request, reply) => {
+    const parsedParams = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.code(400).send({ error: "Données invalides", details: parsedParams.error.flatten() });
+    }
+
+    const parsedBody = updatePetSchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: "Données invalides", details: parsedBody.error.flatten() });
+    }
+
+    const { userId, role } = request.user;
+    const pet = await fastify.prisma.pet.findUnique({
+      where: { id: parsedParams.data.id },
+      select: { id: true, ownerId: true, isActive: true },
+    });
+
+    if (!pet) {
+      return reply.code(404).send({ error: "Animal introuvable." });
+    }
+
+    if (!pet.isActive) {
+      return reply.code(404).send({ error: "Animal supprimé." });
+    }
+
+    if (role === "CLIENT" && pet.ownerId !== userId) {
+      return reply.code(403).send({ error: "Accès refusé." });
+    }
+
+    const updated = await fastify.prisma.pet.update({
+      where: { id: pet.id },
+      data: parsedBody.data,
+    });
+
+    return reply.send({ pet: updated });
+  });
+
+  fastify.delete("/pets/:id", async (request, reply) => {
+    const parsedParams = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.code(400).send({ error: "Données invalides", details: parsedParams.error.flatten() });
+    }
+
+    const { userId, role } = request.user;
+    const pet = await fastify.prisma.pet.findUnique({
+      where: { id: parsedParams.data.id },
+      select: { id: true, ownerId: true, isActive: true },
+    });
+
+    if (!pet) {
+      return reply.code(404).send({ error: "Animal introuvable." });
+    }
+
+    if (!pet.isActive) {
+      return reply.code(404).send({ error: "Animal déjà supprimé." });
+    }
+
+    if (role === "CLIENT" && pet.ownerId !== userId) {
+      return reply.code(403).send({ error: "Accès refusé." });
+    }
+
+    await fastify.prisma.pet.update({
+      where: { id: pet.id },
+      data: { isActive: false },
+    });
+
+    await logAudit(fastify.prisma, {
+      userId: userId,
+      action: "DELETE_PET",
+      targetType: "Pet",
+      targetId: pet.id,
+    });
+
+    return reply.send({ message: "Animal supprimé." });
   });
 
   fastify.get("/pets/:id/medical-records", async (request, reply) => {

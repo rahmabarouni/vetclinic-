@@ -87,4 +87,48 @@ export default async function notificationsRoutes(fastify: FastifyInstance) {
 
     return reply.send({ updated: result.count });
   });
+
+  fastify.delete("/notifications/:id", async (request, reply) => {
+    const parsedParams = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.code(400).send({ error: "Données invalides", details: parsedParams.error.flatten() });
+    }
+
+    const { userId, role } = request.user;
+    const notification = await fastify.prisma.notification.findUnique({
+      where: { id: parsedParams.data.id },
+      select: { id: true, recipientId: true },
+    });
+
+    if (!notification) {
+      return reply.code(404).send({ error: "Notification introuvable." });
+    }
+
+    if (role !== "ADMIN" && role !== "STAFF" && notification.recipientId !== userId) {
+      return reply.code(403).send({ error: "Accès refusé." });
+    }
+
+    await fastify.prisma.notification.delete({ where: { id: notification.id } });
+    return reply.send({ message: "Notification supprimée." });
+  });
+
+  fastify.patch("/notifications/mark-read", async (request, reply) => {
+    const parsed = z.object({ ids: z.array(z.string().uuid()).min(1) }).safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
+    }
+
+    const { userId, role } = request.user;
+
+    const where = role === "ADMIN" || role === "STAFF"
+      ? { id: { in: parsed.data.ids } }
+      : { id: { in: parsed.data.ids }, recipientId: userId };
+
+    const result = await fastify.prisma.notification.updateMany({
+      where,
+      data: { isRead: true, readAt: new Date() },
+    });
+
+    return reply.send({ updated: result.count });
+  });
 }
