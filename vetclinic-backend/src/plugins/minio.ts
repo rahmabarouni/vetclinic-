@@ -2,6 +2,7 @@ import fp from "fastify-plugin";
 import { FastifyInstance } from "fastify";
 import { S3Client, PutObjectCommand, HeadBucketCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getMinioUser, getMinioPassword } from "../validate-env";
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -40,8 +41,8 @@ async function ensureBucket(s3: S3Client, bucket: string): Promise<void> {
 
 export default fp(async (fastify: FastifyInstance) => {
   const endpoint = process.env.MINIO_ENDPOINT || "http://localhost:9000";
-  const accessKeyId = process.env.MINIO_ROOT_USER || "REDACTED_MINIO_USER";
-  const secretAccessKey = process.env.MINIO_ROOT_PASSWORD || "REDACTED_MINIO_PASSWORD";
+  const accessKeyId = getMinioUser();
+  const secretAccessKey = getMinioPassword();
 
   const s3 = new S3Client({
     endpoint,

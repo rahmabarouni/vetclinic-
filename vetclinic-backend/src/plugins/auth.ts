@@ -2,6 +2,7 @@ import fp from "fastify-plugin";
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import jwt from "@fastify/jwt";
 import { UserRole } from "@prisma/client";
+import { getJwtSecret } from "../validate-env";
 
 export interface JwtPayload {
   userId: string;
@@ -10,7 +11,7 @@ export interface JwtPayload {
 
 export default fp(async (fastify: FastifyInstance) => {
   fastify.register(jwt, {
-    secret: process.env.JWT_SECRET || "REDACTED_DEV_SECRET",
+    secret: getJwtSecret(),
   });
 
   fastify.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
