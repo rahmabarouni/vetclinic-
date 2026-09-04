@@ -30,6 +30,7 @@ export default async function searchRoutes(fastify: FastifyInstance) {
     };
 
     const medicalRecordWhere = {
+      ...(role === "CLIENT" ? { pet: { ownerId: userId } } : {}),
       OR: [
         { title: { contains: term, mode: "insensitive" as const } },
         { diagnosis: { contains: term, mode: "insensitive" as const } },

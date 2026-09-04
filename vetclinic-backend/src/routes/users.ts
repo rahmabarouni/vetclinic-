@@ -60,41 +60,4 @@ export default async function usersRoutes(fastify: FastifyInstance) {
 
     return reply.send({ user });
   });
-
-  fastify.post("/users/profile/photo", async (request, reply) => {
-    const data = await request.file();
-    if (!data) {
-      return reply.code(400).send({ error: "Aucun fichier fourni." });
-    }
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(data.mimetype)) {
-      return reply.code(415).send({ error: "Type non supporté. Utilisez JPEG, PNG ou WebP." });
-    }
-
-    const chunks: Buffer[] = [];
-    let totalSize = 0;
-    const maxSize = 5 * 1024 * 1024;
-
-    for await (const chunk of data.file) {
-      totalSize += chunk.length;
-      if (totalSize > maxSize) {
-        return reply.code(413).send({ error: "Fichier trop volumineux (max 5 Mo)." });
-      }
-      chunks.push(chunk);
-    }
-
-    const buffer = Buffer.concat(chunks);
-    const ext = data.filename.split(".").pop() || "jpg";
-    const key = `profiles/${request.user.userId}-${Date.now()}.${ext}`;
-
-    const { url } = await fastify.minio.uploadFile(key, buffer, data.mimetype);
-
-    await fastify.prisma.user.update({
-      where: { id: request.user.userId },
-      data: { photoUrl: url },
-    });
-
-    return reply.code(201).send({ photo: { key, url } });
-  });
 }
