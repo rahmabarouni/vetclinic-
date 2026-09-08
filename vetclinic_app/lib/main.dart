@@ -4,6 +4,7 @@ import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/pets_list_screen.dart';
 import 'screens/appointments_list_screen.dart';
+import 'screens/conversations_list_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -54,6 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _screens = const [
     PetsListScreen(),
     AppointmentsListScreen(),
+    ConversationsListScreen(),
   ];
 
   @override
@@ -104,6 +106,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.event_outlined),
             selectedIcon: Icon(Icons.event),
             label: 'RDV',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Messages',
           ),
         ],
       ),
