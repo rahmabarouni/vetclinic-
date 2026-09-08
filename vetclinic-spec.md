@@ -224,7 +224,7 @@ vetclinic-backend/
 
 ---
 
-## 8. API Backend — endpoints (41 routes)
+## 8. API Backend — endpoints (40 routes)
 
 Source de vérité : Swagger à `/docs` (UI) et `/docs/json` (OpenAPI 3.0).
 
@@ -261,14 +261,14 @@ Source de vérité : Swagger à `/docs` (UI) et `/docs/json` (OpenAPI 3.0).
 
 | Méthode | Route | Rôle | Description |
 |---|---|---|---|
-| GET | `/api/v1/pets/:id/medical-records` | CLIENT | Historique médical d'un animal |
+| GET | `/api/v1/pets/:id/medical-records` | ALL (CLIENT: ownership only) | Historique médical d'un animal |
 | POST | `/api/v1/medical-records` | VET/ADMIN/STAFF | Créer un dossier médical |
 
 ### Documents
 
 | Méthode | Route | Rôle | Description |
 |---|---|---|---|
-| GET | `/api/v1/pets/:id/documents` | CLIENT | Documents d'un animal |
+| GET | `/api/v1/pets/:id/documents` | ALL (CLIENT: ownership only) | Documents d'un animal |
 | POST | `/api/v1/documents` | VET/ADMIN/STAFF | Attacher un document |
 | GET | `/api/v1/downloads` | CLIENT | Télécharger via presigned URL (ownership vérifié) |
 
@@ -310,7 +310,6 @@ Source de vérité : Swagger à `/docs` (UI) et `/docs/json` (OpenAPI 3.0).
 
 | Méthode | Route | Rôle | Description |
 |---|---|---|---|
-| GET | `/api/v1/veterinarians` | CLIENT | Liste des véto |
 | POST | `/api/v1/veterinarians` | ADMIN | Créer un véto |
 
 ### Utilisateurs
