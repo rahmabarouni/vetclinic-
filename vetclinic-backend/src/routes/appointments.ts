@@ -150,6 +150,20 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
       return reply.code(403).send({ error: "Accès refusé." });
     }
 
+    const conflictingPetAppt = await fastify.prisma.appointment.findFirst({
+      where: {
+        petId: parsed.data.petId,
+        status: { in: ["PENDING", "CONFIRMED"] },
+        scheduledStart: { lt: parsed.data.scheduledEnd },
+        scheduledEnd: { gt: parsed.data.scheduledStart },
+      },
+      select: { id: true },
+    });
+
+    if (conflictingPetAppt) {
+      return reply.code(409).send({ error: "Créneau déjà occupé pour cet animal." });
+    }
+
     const veterinarianId = parsed.data.veterinarianId ?? null;
     if (veterinarianId) {
       const veterinarian = await fastify.prisma.veterinarian.findUnique({

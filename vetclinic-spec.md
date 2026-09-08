@@ -1,6 +1,8 @@
 # Spécification projet — Application de gestion de clinique vétérinaire
 
 > Document de référence destiné à un agent de développement (humain ou IA). Il couvre le produit, l'architecture, la stack technique, le modèle de données et les règles de sécurité/conformité à respecter impérativement.
+>
+> **Dernière mise à jour** : 9 septembre 2026 — reflet de l'état réel du code.
 
 ---
 
@@ -56,18 +58,20 @@ Il s'agit d'un **projet destiné à un vrai lancement commercial** — la robust
 
 ## 3. Stack technique
 
-| Couche | Technologie | Justification |
-|---|---|---|
-| App mobile client | **Flutter (Dart)** | Cross-platform, un seul code pour iOS/Android, rendu UI natif très cohérent, bon écosystème de packages pour WebSocket/FCM |
-| Back-office web | **Next.js (React)** | Partage de composants/logique avec l'app mobile, écosystème React unifié |
-| Backend / API | **Node.js + Fastify + TypeScript** | Performance, validation de schéma native (sécurité), plus léger que NestJS pour un dev solo. Le mobile (Dart) et le backend (TS) sont dans des langages différents — aucune logique n'est partagée entre eux, toute la validation métier doit donc vivre côté backend, jamais dupliquée côté client |
-| ORM | **Prisma** | Types générés automatiquement, migrations sûres — important pour un dossier médical |
-| Base de données | **PostgreSQL** | Relationnel, robuste, adapté à des données structurées et sensibles |
-| Chat temps réel | **Socket.io** ou `@fastify/websocket` | Simple à intégrer avec Fastify |
-| Authentification | **JWT + refresh tokens**, rôles (`CLIENT`, `VETERINARIAN`, `ADMIN`, `STAFF`) | Contrôle d'accès fin, nécessaire pour respecter le secret médical |
-| Stockage fichiers | **MinIO (self-hosted, compatible S3)** | Pour photos d'animaux, radios, documents — hébergé localement pour la conformité |
-| Notifications push | **Firebase Cloud Messaging (FCM)** | Seul composant Google toléré : ne transite pas de données personnelles sensibles |
-| Hébergement | **VPS en Tunisie ou hébergeur EU reconnu adéquat par l'INPDP** | Voir section conformité — ne jamais héberger de données de santé sur un cloud américain sans autorisation |
+| Couche | Technologie | Version | Justification |
+|---|---|---|---|
+| App mobile client | **Flutter (Dart)** | SDK ^3.12.2 | Cross-platform, un seul code pour iOS/Android, rendu UI natif très cohérent |
+| Back-office web | **Next.js (React)** | — | Partage de composants/logique avec l'app mobile, écosystème React unifié |
+| Backend / API | **Node.js + Fastify + TypeScript** | Fastify 5.12.1, TypeScript 7.0.2 | Performance, validation de schéma native (sécurité) |
+| Validation | **Zod** | 4.4.3 | Schémas stricts côté backend, types générés |
+| ORM | **Prisma** | 5.20.0 | Types générés automatiquement, migrations sûres |
+| Base de données | **PostgreSQL** | — | Relationnel, robuste, adapté à des données structurées et sensibles |
+| Chat temps réel | **@fastify/websocket** | — | Intégré à Fastify, WebSocket natif |
+| Authentification | **JWT** | — | Tokens signés, rôles (CLIENT, VETERINARIAN, ADMIN, STAFF) |
+| Stockage fichiers | **MinIO** (self-hosted, compatible S3) | — | Photos d'animaux, radios, documents — hébergé localement |
+| Notifications push | **Firebase Cloud Messaging (FCM)** | — | Seul composant Google toléré |
+| Tests | **Vitest** | 5.0.0 | Tests unitaires et d'intégration backend |
+| Hébergement | **VPS en Tunisie ou hébergeur EU reconnu adéquat par l'INPDP** | — | Voir section conformité |
 
 ### Pourquoi pas de solution "tout-en-un" type Firebase/Supabase pour tout ?
 
@@ -81,7 +85,7 @@ Ces plateformes hébergent par défaut sur des serveurs américains. Le transfer
 [App Mobile - Flutter/Dart]  ──┐
                                  ├──► [API Backend - Fastify + TypeScript] ──► [PostgreSQL]
 [Dashboard Web - Next.js]  ────┘              │
-                                                ├──► [Socket.io / WebSocket - Chat temps réel]
+                                                ├──► [WebSocket - Chat temps réel]
                                                 ├──► [MinIO - Stockage fichiers]
                                                 └──► [FCM - Notifications push uniquement]
 ```
@@ -89,29 +93,42 @@ Ces plateformes hébergent par défaut sur des serveurs américains. Le transfer
 - L'app mobile et le dashboard web ne communiquent **jamais directement entre eux** — tout passe par l'API backend.
 - Le backend est l'unique point d'accès à la base de données. Aucun client (mobile ou web) n'a d'accès direct à PostgreSQL.
 - Un job planifié (cron) côté backend vérifie quotidiennement les `Reminder` à échéance et déclenche les notifications correspondantes.
+- La documentation Swagger/OpenAPI est servie à `/docs` (UI) et `/docs/json` (spec JSON).
 
 ---
 
-## 5. Modèle de données (résumé des entités)
+## 5. Modèle de données (schéma Prisma complet)
 
-Le schéma complet est au format Prisma (PostgreSQL). Entités principales :
+Le schéma complet est au fichier `vetclinic-backend/prisma/schema.prisma`. **13 modèles** et **11 enums** :
 
-- **User** — table unique avec un champ `role` (CLIENT / VETERINARIAN / ADMIN / STAFF), plutôt que des tables séparées
-- **Veterinarian** — infos spécifiques liées à un User (spécialité, bio, disponibilité)
-- **Pet** — animal, lié à un `owner` (User client)
-- **Appointment** — rendez-vous : pet, client, véto (nullable si pas encore assigné), type, statut (`PENDING`/`CONFIRMED`/`CANCELLED`/`COMPLETED`/`NO_SHOW`), créneaux
-- **TimeSlotBlock** — blocage de créneaux par un véto
-- **MedicalRecord** — note de consultation, diagnostic, liée à un animal et éventuellement à un rendez-vous
-- **Reminder** — rappel (vaccin, traitement), généré automatiquement à partir d'un `MedicalRecord`, avec `due_date` et statut d'envoi
-- **Conversation** / **Message** — chat client-véto, avec pièces jointes (image/document)
-- **Document** — fichiers liés à un animal ou une consultation (radio, analyse, ordonnance, photo)
-- **Notification** — notification interne (rappel RDV, nouveau message, confirmation/annulation, rappel vaccin)
+### Modèles
 
-### Règles métier clés à respecter dans l'implémentation
+| Modèle | Table | Description |
+|---|---|---|
+| **User** | `users` | Compte utilisateur (CLIENT, VETERINARIAN, ADMIN, STAFF) |
+| **Veterinarian** | `veterinarians` | Profil vétérinaire lié à un User (spécialité, bio, disponibilité) |
+| **Pet** | `pets` | Animal lié à un owner (User client) |
+| **Appointment** | `appointments` | Rendez-vous : pet, client, véto (nullable), type, statut, créneaux |
+| **TimeSlotBlock** | `time_slot_blocks` | Blocage de créneaux par un véto |
+| **MedicalRecord** | `medical_records` | Note de consultation, diagnostic, lié à un animal et un véto |
+| **Reminder** | `reminders` | Rappel (vaccin, traitement), généré automatiquement depuis un MedicalRecord |
+| **Conversation** | `conversations` | Conversation client-véto |
+| **Message** | `messages` | Message dans une conversation (texte + pièce jointe) |
+| **Document** | `documents` | Fichiers liés à un animal ou un dossier médical |
+| **Notification** | `notifications` | Notification interne (rappel RDV, message, etc.) |
+| **AuditLog** | `audit_logs` | Journal d'audit des actions sensibles (création, suppression, consultation) |
+| **PasswordResetToken** | `password_reset_tokens` | Tokens de réinitialisation de mot de passe |
 
-1. Un `MedicalRecord` de type vaccination doit pouvoir générer automatiquement un `Reminder` avec une `due_date` calculée (ex : +6 mois), pas uniquement une saisie manuelle.
+### Enums
+
+`UserRole`, `AppointmentType`, `AppointmentStatus`, `MedicalRecordType`, `ReminderType`, `ConversationStatus`, `AttachmentType`, `DocumentType`, `NotificationType`, `PetSpecies`, `PetSex`
+
+### Règles métier clés
+
+1. Un `MedicalRecord` de type vaccination doit pouvoir générer automatiquement un `Reminder` avec une `due_date` calculée (ex : +6 mois).
 2. Le workflow de statut d'un `Appointment` doit suivre : `PENDING → CONFIRMED → COMPLETED` (ou `CANCELLED` / `NO_SHOW` à tout moment avant `COMPLETED`).
-3. Avant de confirmer un rendez-vous à un vétérinaire donné, vérifier qu'il n'y a pas de chevauchement avec un autre rendez-vous `PENDING` ou `CONFIRMED` sur le même créneau.
+3. Avant de créer un rendez-vous, vérifier qu'il n'y a pas de chevauchement avec un autre rendez-vous `PENDING` ou `CONFIRMED` sur le même animal (et le même vétérinaire si assigné).
+4. Les animaux supportent le soft delete via `isActive` : un `DELETE /pets/:id` met `isActive` à `false`, et `GET /pets` ne retourne que les animaux actifs.
 
 ---
 
@@ -128,103 +145,310 @@ Le schéma complet est au format Prisma (PostgreSQL). Entités principales :
 
 ### 6.2 Règles techniques obligatoires
 
-| Règle | Détail |
-|---|---|
-| **Chiffrement en transit** | HTTPS/TLS obligatoire sur toutes les communications (API, chat, uploads) — aucune exception, y compris en développement si des données réelles sont utilisées |
-| **Chiffrement au repos** | Mots de passe hachés avec bcrypt (jamais en clair, jamais réversible) ; envisager le chiffrement au niveau disque pour la base de données en production |
-| **Contrôle d'accès strict (RBAC)** | Un client ne peut accéder qu'à ses propres animaux, rendez-vous, conversations et documents. Un véto/staff peut accéder aux dossiers de tous les clients, mais chaque accès à un dossier médical devrait être **tracé** (log d'audit) |
-| **Validation stricte des entrées** | Toutes les données entrantes doivent être validées par un schéma strict (ex : Zod côté Fastify) avant traitement — ne jamais faire confiance aux données du client |
-| **Consentement explicite** | À l'inscription, case à cocher non pré-cochée pour la collecte et l'usage des données personnelles |
-| **Droit d'accès et de suppression** | Le client doit pouvoir consulter et demander la suppression de ses données personnelles |
-| **Sécurisation du chat** | La messagerie doit être chiffrée en transit ; éviter de stocker en clair des données médicales sensibles échangées par chat sans contrôle d'accès équivalent au dossier médical |
-| **Hébergement** | Base de données et stockage de fichiers hébergés en Tunisie ou dans un pays reconnu adéquat par l'INPDP. Ne pas utiliser Firebase/AWS US/Google Cloud US par défaut pour les données personnelles ou de santé |
-| **Séparation des secrets** | Toutes les clés (JWT secret, identifiants base de données, clés API) dans des variables d'environnement, jamais commitées dans le code source |
-| **Principe du moindre privilège** | Chaque rôle (client, véto, staff, admin) ne doit avoir accès qu'aux routes et données strictement nécessaires à sa fonction |
-
-### 6.3 Recommandation
-
-Avant le lancement commercial, une consultation avec un avocat spécialisé ou directement avec l'INPDP (inpdp.nat.tn) est nécessaire pour finaliser la déclaration/autorisation de traitement — ce document ne remplace pas un avis juridique.
+| Règle | Détail | État |
+|---|---|---|
+| **Chiffrement en transit** | HTTPS/TLS obligatoire sur toutes les communications | ✅ Configuré (MinIO, API) |
+| **Chiffrement au repos** | Mots de passe hachés avec bcrypt (12 rounds) | ✅ Implémenté |
+| **Contrôle d'accès strict (RBAC)** | Un client ne peut accéder qu'à ses propres animaux, RDV, conversations et documents | ✅ Implémenté via `fastify.authorize` |
+| **Validation stricte des entrées** | Toutes les données entrantes validées par Zod 4.4.3 | ✅ Implémenté sur toutes les routes |
+| **Rate limiting** | 5 req/min sur routes auth, 100 req/min global | ✅ Implémenté via `@fastify/rate-limit` |
+| **Audit log** | Traçabilité des actions sensibles (création, suppression) sur pets, medical-records, documents | ✅ Implémenté (`AuditLog` model + `logAudit` util) |
+| **Fail-fast sur secrets** | Blocage au démarrage en production si `JWT_SECRET`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` manquants | ✅ Implémenté (`validate-env.ts`) |
+| **Consentement explicite** | À l'inscription, case à cocher non pré-cochée | ⏳ Frontend uniquement |
+| **Droit d'accès et de suppression** | Le client doit pouvoir consulter et demander la suppression de ses données | ⏳ Partiellement (soft delete animaux) |
+| **Sécurisation du chat** | Messagerie chiffrée en transit, contrôle d'accès sur les conversations | ✅ WebSocket avec JWT auth |
+| **Hébergement** | DB et fichiers en Tunisie ou pays reconnu adéquat | ⏳ Avant mise en production |
+| **Séparation des secrets** | Variables d'environnement, jamais commitées | ✅ `.env` dans `.gitignore`, `.env.example` fourni |
 
 ---
 
-## 7. Backend — structure attendue
+## 7. Backend — structure du code
 
 ```
 vetclinic-backend/
 ├── prisma/
-│   └── schema.prisma          # Modèle de données complet
+│   ├── schema.prisma              # Schéma complet (13 modèles)
+│   ├── seed.ts                    # Seed idempotent (users, pets, appts, records)
+│   └── migrations/                # 11 migrations Prisma
 ├── src/
+│   ├── server.ts                  # Point d'entrée (ecoute + cron)
+│   ├── app.ts                     # buildApp() — registre plugins/routes (testable)
+│   ├── validate-env.ts            # Fail-fast production secrets
 │   ├── plugins/
-│   │   ├── prisma.ts           # Connexion DB partagée (fastify.prisma)
-│   │   └── auth.ts             # JWT + fastify.authenticate / fastify.authorize(roles)
+│   │   ├── prisma.ts              # fastify.prisma (connexion DB)
+│   │   ├── auth.ts                # JWT + fastify.authenticate / fastify.authorize
+│   │   └── minio.ts               # Client S3 (upload + presigned URLs)
 │   ├── routes/
-│   │   ├── auth.ts             # /auth/register, /auth/login, /auth/me
-│   │   ├── pets.ts             # CRUD animaux + historique médical
-│   │   ├── appointments.ts     # Prise de RDV, changement de statut, annulation
-│   │   ├── medical-records.ts  # (à construire) notes de consultation côté véto
-│   │   ├── reminders.ts        # (à construire) génération et suivi des rappels
-│   │   ├── conversations.ts    # (à construire) chat REST + WebSocket
-│   │   └── dashboard.ts        # (à construire) statistiques agrégées côté véto
+│   │   ├── auth.ts                # POST register, login, change-password
+│   │   ├── password-reset.ts      # POST forgot-password, reset-password
+│   │   ├── pets.ts                # CRUD animaux + soft delete
+│   │   ├── appointments.ts        # CRUD RDV + overlap check
+│   │   ├── medical-records.ts     # CRUD dossiers médicaux
+│   │   ├── documents.ts           # CRUD documents (liés à pet/medical-record)
+│   │   ├── downloads.ts           # GET presigned URL (ownership vérifié)
+│   │   ├── uploads.ts             # POST multipart upload → MinIO
+│   │   ├── conversations.ts       # REST chat (list, messages, create)
+│   │   ├── ws-conversations.ts    # WebSocket chat (JWT auth via query)
+│   │   ├── time-slot-blocks.ts    # CRUD blocages créneaux véto
+│   │   ├── veterinarians.ts       # CRUD vétérinaires (admin)
+│   │   ├── notifications.ts       # CRUD notifications + batch mark-read
+│   │   ├── dashboard.ts           # Stats agrégées (véto/admin)
+│   │   ├── activity.ts            # Feed d'activité (audit logs paginés)
+│   │   ├── search.ts              # Recherche globale (pets, appointments, records)
+│   │   └── users.ts               # Profil utilisateur (GET/PUT)
 │   ├── utils/
-│   │   └── validation.ts       # Schémas Zod
-│   └── server.ts               # Point d'entrée Fastify
+│   │   ├── audit.ts               # logAudit() helper
+│   │   └── pagination.ts          # getPaginationParams, paginatedResponse
+│   ├── cron/
+│   │   └── reminders.ts           # Job quotidien 8h — vérifie rappels échus
+│   └── __tests__/
+│       ├── helper.ts              # getApp()/closeApp() pour tests
+│       ├── auth.test.ts           # 5 tests (register, login, duplicate, etc.)
+│       ├── rbac.test.ts           # 4 tests (CLIENT→403, ADMIN→200, etc.)
+│       ├── ownership.test.ts      # 5 tests (isolation cross-client)
+│       └── appointments.test.ts   # 4 tests (overlap, invalid, cross-owner)
+├── vitest.config.ts
+├── tsconfig.json
+└── package.json
 ```
 
-### Conventions à respecter
+### Conventions
 
-- Toutes les routes protégées utilisent `preHandler: [fastify.authenticate]`, et celles réservées au staff ajoutent `fastify.authorize(['VETERINARIAN', 'ADMIN', 'STAFF'])`.
-- Toute réponse contenant des données utilisateur doit explicitement sélectionner les champs retournés (`select`) pour éviter d'exposer accidentellement `passwordHash` ou d'autres champs sensibles.
-- Le versioning d'API se fait via un préfixe `/api/v1`.
-
----
-
-## 8. Frontend — attentes générales
-
-### 8.1 App mobile (Flutter)
-
-- Authentification persistante : stockage sécurisé du token via `flutter_secure_storage` (jamais `SharedPreferences` en clair pour un token)
-- Gestion d'état recommandée : `Riverpod` ou `Provider` (éviter `setState` pur dès que l'app dépasse quelques écrans — plus difficile à maintenir et à tester)
-- Client HTTP : `dio` (intercepteurs pour injecter le token JWT automatiquement, gérer le refresh, centraliser la gestion d'erreurs)
-- Chat temps réel : `web_socket_channel` ou `socket_io_client` selon le choix fait côté backend (section 3)
-- Notifications push : `firebase_messaging` + gestion des permissions iOS/Android
-- Écrans principaux : Connexion/Inscription, Liste des animaux, Détail animal + historique, Prise de RDV, Liste des RDV, Chat, Notifications, Profil
-- Gestion des états de chargement/erreur explicite sur chaque appel API (pas de silence en cas d'échec réseau) — utiliser des états explicites (`loading` / `error` / `data`) plutôt que de déduire l'état depuis des booléens épars
-- Respecter les conventions Material Design (Android) et Cupertino (iOS) là où c'est pertinent, sans sur-personnaliser inutilement pour la v1
-
-### 8.2 Back-office web (Next.js)
-
-- Authentification staff séparée du flux client (routes protégées par rôle)
-- Écrans principaux : Dashboard (stats), Calendrier RDV, Liste clients/animaux, Fiche animal (historique + ajout de note), Chat, Blocage de créneaux, Gestion de profil véto
-- Le calendrier est l'écran central — doit supporter vue jour/semaine, drag-and-drop optionnel pour reporter un RDV
-
-### 8.3 Règles transverses
-
-- Aucune donnée sensible (token, informations médicales) ne doit être loggée côté client en production.
-- Toute erreur API renvoyée au frontend doit être un message générique côté utilisateur (ne pas exposer de détails techniques/stack traces).
+- Versioning : `/api/v1/...`
+- Toutes les routes protégées : `preHandler: [fastify.authenticate]`
+- Routes staff : ajout de `fastify.authorize(['VETERINARIAN', 'ADMIN', 'STAFF'])`
+- Validation : Zod 4, `details: parsed.error.flatten()` sur les réponses 400
+- Pagination : `GET /resource?page=1&limit=20` → `{ data: [...], pagination: { page, limit, total, totalPages } }`
+- Réponses wrappées : `{ pet: {...} }`, `{ appointment: {...} }` pour les créations
+- Ownership : les CLIENTs ne voient que leurs propres données (filtrage côté serveur)
 
 ---
 
-## 9. Ce qu'il reste à construire (au-delà du MVP backend déjà initialisé)
+## 8. API Backend — endpoints (41 routes)
 
-- [ ] Routes véto : `TimeSlotBlock` (blocage de créneaux)
-- [ ] Routes véto : création de `MedicalRecord` + génération automatique de `Reminder`
-- [ ] Chat temps réel (WebSocket) — routes `Conversation` / `Message`
-- [ ] Upload de fichiers (photos, documents médicaux) via `@fastify/multipart` + MinIO
-- [ ] Job planifié (cron) pour les rappels de vaccins/traitements à échéance
-- [ ] Intégration FCM pour l'envoi effectif des notifications push
-- [ ] Endpoints d'agrégation pour le dashboard stats (RDV du jour, taux d'annulation, etc.)
-- [ ] App mobile Flutter (tous les écrans listés en 8.1)
-- [ ] Dashboard web Next.js (tous les écrans listés en 8.2)
-- [ ] Tests automatisés (backend au minimum : auth, permissions, logique de rendez-vous)
-- [ ] Log d'audit des accès aux dossiers médicaux (traçabilité, exigence de conformité)
+Source de vérité : Swagger à `/docs` (UI) et `/docs/json` (OpenAPI 3.0).
+
+### Authentification
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| POST | `/api/v1/auth/register` | Public | Inscription client |
+| POST | `/api/v1/auth/login` | Public | Connexion (retourne JWT + user) |
+| POST | `/api/v1/auth/change-password` | Auth | Changement de mot de passe (requiert mot de passe actuel) |
+| POST | `/api/v1/auth/forgot-password` | Public | Demande de réinitialisation (envoie token) |
+| POST | `/api/v1/auth/reset-password` | Public | Réinitialisation avec token |
+
+### Animaux (Pets)
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/pets` | CLIENT | Liste des animaux (filtré par ownership) |
+| GET | `/api/v1/pets/:id` | CLIENT | Détail d'un animal |
+| POST | `/api/v1/pets` | CLIENT | Créer un animal |
+| PATCH | `/api/v1/pets/:id` | CLIENT | Modifier un animal |
+| DELETE | `/api/v1/pets/:id` | CLIENT | Soft delete (isActive=false) |
+
+### Rendez-vous (Appointments)
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/appointments` | CLIENT | Liste des RDV (filtré par ownership) |
+| POST | `/api/v1/appointments` | CLIENT | Créer un RDV (overlap check animal + véto) |
+| PATCH | `/api/v1/appointments/:id/status` | VET/ADMIN | Changer le statut |
+| DELETE | `/api/v1/appointments/:id` | CLIENT | Annuler un RDV (→ CANCELLED) |
+
+### Dossiers médicaux
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/pets/:id/medical-records` | CLIENT | Historique médical d'un animal |
+| POST | `/api/v1/medical-records` | VET/ADMIN/STAFF | Créer un dossier médical |
+
+### Documents
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/pets/:id/documents` | CLIENT | Documents d'un animal |
+| POST | `/api/v1/documents` | VET/ADMIN/STAFF | Attacher un document |
+| GET | `/api/v1/downloads` | CLIENT | Télécharger via presigned URL (ownership vérifié) |
+
+### Uploads
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| POST | `/api/v1/uploads` | VET/ADMIN/STAFF | Upload multipart vers MinIO |
+
+### Chat (Conversations)
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/conversations` | CLIENT | Liste des conversations |
+| POST | `/api/v1/conversations` | CLIENT | Créer une conversation |
+| GET | `/api/v1/conversations/:id/messages` | CLIENT | Messages paginés |
+| POST | `/api/v1/conversations/:id/messages` | CLIENT | Envoyer un message (REST) |
+| WS | `/api/v1/conversations/:id/ws?token=` | Auth | WebSocket temps réel |
+
+### Notifications
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/notifications` | CLIENT | Liste des notifications |
+| GET | `/api/v1/notifications/unread-count` | CLIENT | Nombre de non-lues |
+| PATCH | `/api/v1/notifications/:id/read` | CLIENT | Marquer comme lu |
+| PATCH | `/api/v1/notifications/read-all` | CLIENT | Marquer toutes comme lues |
+| DELETE | `/api/v1/notifications/:id` | CLIENT | Supprimer une notification |
+
+### Blocages de créneaux
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/time-slot-blocks` | VET/ADMIN/STAFF | Liste des blocages |
+| POST | `/api/v1/time-slot-blocks` | VET/ADMIN/STAFF | Créer un blocage |
+| DELETE | `/api/v1/time-slot-blocks/:id` | VET/ADMIN/STAFF | Supprimer un blocage |
+
+### Vétérinaires
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/veterinarians` | CLIENT | Liste des véto |
+| POST | `/api/v1/veterinarians` | ADMIN | Créer un véto |
+
+### Utilisateurs
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/users/profile` | Auth | Profil de l'utilisateur connecté |
+| PUT | `/api/v1/users/profile` | Auth | Modifier son profil |
+
+### Dashboard & Activité
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/dashboard/stats` | VET/ADMIN/STAFF | Statistiques agrégées |
+| GET | `/api/v1/activity` | CLIENT | Feed d'activité (audit logs paginés) |
+| GET | `/api/v1/activity/stats` | CLIENT | Statistiques d'activité |
+
+### Recherche
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/api/v1/search?q=...` | CLIENT | Recherche globale (pets, appointments, records) |
+
+### Santé
+
+| Méthode | Route | Rôle | Description |
+|---|---|---|---|
+| GET | `/health` | Public | DB ping, MinIO, uptime, mémoire |
+
+---
+
+## 9. Frontend — état actuel
+
+### 9.1 App mobile (Flutter)
+
+**Statut** : fonctionnelle sur Chrome et Android (SDK 37). Tests d'intégration API : 34/34 passent.
+
+#### Structure du code
+
+```
+vetclinic_app/lib/
+├── main.dart                          # Navigation (NavigationBar Animaux/RDV)
+├── models/
+│   ├── user.dart                      # Modèle User
+│   ├── pet.dart                       # Modèle Pet (fromJson, speciesLabel, sexLabel)
+│   └── appointment.dart               # Modèle Appointment (nested Pet/Client)
+├── services/
+│   └── api_service.dart               # Dio + JWT interceptor + flutter_secure_storage
+├── providers/
+│   ├── auth_provider.dart             # AuthState/AuthNotifier (login, register, logout)
+│   ├── pets_provider.dart             # PetsState/PetsNotifier (load, create, refresh)
+│   └── appointments_provider.dart     # AppointmentsState (load, create, cancel)
+└── screens/
+    ├── login_screen.dart              # Connexion
+    ├── register_screen.dart           # Inscription
+    ├── pets_list_screen.dart          # Liste animaux (pull-to-refresh, FAB)
+    ├── pet_form_screen.dart           # Formulaire ajout animal
+    ├── appointments_list_screen.dart  # Liste RDV (couleurs/statuts)
+    └── appointment_form_screen.dart   # Formulaire création RDV
+```
+
+#### Stack Flutter
+
+- **Riverpod** pour la gestion d'état
+- **Dio** pour les appels API (intercepteur JWT automatique)
+- **flutter_secure_storage** pour le stockage sécurisé du token JWT (chiffré, jamais en clair)
+- **Material 3** (useMaterial3: true)
+
+#### Limitations connues
+
+- **SDK Android 37** : le build Android nécessite `compileSdk = 37` dans `build.gradle.kts`. Le téléchargement du SDK Platform 37 via sdkmanager peut être lent selon la connexion. Solution documentée dans le README.
+- **Pas encore implémenté** : chat (Phase 5), photo upload, notifications push, écran profil détaillé.
+
+### 9.2 Back-office web (Next.js)
+
+**Statut** : non démarré (Phase 6 prévue).
+
+---
+
+## 10. Tests
+
+### Backend (Vitest)
+
+| Fichier | Tests | Couverture |
+|---|---|---|
+| `auth.test.ts` | 5 | Register, login, duplicate email, wrong password, nonexistent email |
+| `rbac.test.ts` | 4 | CLIENT→403 dashboard, ADMIN→200, CLIENT→403 vets, no token→401 |
+| `ownership.test.ts` | 5 | Can't view/edit/delete another's pet, filtered list |
+| `appointments.test.ts` | 4 | Overlap detection, invalid times, cross-owner pet→403 |
+| **Total** | **18** | Auth, RBAC, ownership, appointments |
+
+### Intégration API (scripts PowerShell)
+
+| Scénario | Résultat |
+|---|---|
+| Login jean.dupont@email.test | 34/34 PASS |
+| Liste animaux (isolation) | ✅ |
+| Création animal + vérification | ✅ |
+| Liste RDV (isolation) | ✅ |
+| Création RDV | ✅ |
+| Annulation RDV (→ CANCELLED) | ✅ |
+| Erreur chevauchement créneau (409) | ✅ |
+| Isolation cross-client (Marie vs Jean) | ✅ |
+| Erreur 403 cross-owner | ✅ |
+
+---
+
+## 11. Ce qu'il reste à construire
+
+### Prioritaire (v1 MVP)
+
+- [ ] **Chat Flutter** (Phase 5) — WebSocket branché sur le backend existant
+- [ ] **Dashboard Next.js** (Phase 6) — calendrier RDV, changement de statut
+- [ ] Intégration FCM pour notifications push
+- [ ] Upload de fichiers côté Flutter (photos animaux, documents)
+- [ ] Écran profil utilisateur dans l'app mobile
+- [ ] Consentement explicite à l'inscription (case à cocher)
+
+### Secondaire (post-MVP)
+
+- [ ] Dashboard stats avancées (graphiques, tendances)
+- [ ] Génération automatique de rappels depuis les MedicalRecord
+- [ ] Ordonnances numériques structurées
+- [ ] Programme de fidélité, avis clients
+
+### Conformité
+
 - [ ] Déclaration/autorisation auprès de l'INPDP avant mise en production
+- [ ] Hébergement validé en Tunisie ou pays adéquat
+- [ ] Audit de sécurité externe
 
 ---
 
-## 10. Résumé des priorités pour l'agent qui reprend ce projet
+## 12. Résumé des priorités pour l'agent qui reprend ce projet
 
 1. Respecter strictement le modèle de données et les rôles définis (ne pas simplifier le RBAC).
 2. Ne jamais introduire de dépendance à un service cloud hébergeant des données hors de Tunisie sans validation explicite.
 3. Toujours valider les entrées et restreindre les données retournées par l'API selon le rôle de l'utilisateur.
 4. Le MVP prioritaire est : auth, gestion animaux, prise de RDV, chat texte+photo, rappels vaccins, dashboard stats. Le paiement est explicitement hors scope.
 5. Documenter toute nouvelle route ou table ajoutée en cohérence avec ce document.
+6. **Ne jamais remplacer `flutter_secure_storage` par `shared_preferences`** pour stocker des tokens — c'est une régression de sécurité (stockage en clair vs chiffré).

@@ -61,6 +61,82 @@ class ApiService {
     await clearToken();
   }
 
+  Future<Map<String, dynamic>> getPets({int page = 1, int limit = 20, String? search}) async {
+    final queryParams = <String, dynamic>{'page': page, 'limit': limit};
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
+    final response = await _dio.get('/api/v1/pets', queryParameters: queryParams);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createPet({
+    required String name,
+    required String species,
+    String? breed,
+    String? sex,
+    double? weightKg,
+  }) async {
+    final response = await _dio.post('/api/v1/pets', data: {
+      'name': name,
+      'species': species,
+      'breed': ?breed,
+      'sex': ?sex,
+      'weightKg': ?weightKg,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updatePet(String id, {
+    String? name,
+    String? species,
+    String? breed,
+    String? sex,
+    double? weightKg,
+  }) async {
+    final response = await _dio.patch('/api/v1/pets/$id', data: {
+      'name': ?name,
+      'species': ?species,
+      'breed': ?breed,
+      'sex': ?sex,
+      'weightKg': ?weightKg,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> deletePet(String id) async {
+    await _dio.delete('/api/v1/pets/$id');
+  }
+
+  Future<Map<String, dynamic>> getAppointments({int page = 1, int limit = 20, String? search}) async {
+    final queryParams = <String, dynamic>{'page': page, 'limit': limit};
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
+    final response = await _dio.get('/api/v1/appointments', queryParameters: queryParams);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createAppointment({
+    required String petId,
+    required String appointmentType,
+    required DateTime scheduledStart,
+    required DateTime scheduledEnd,
+    String? reason,
+    String? veterinarianId,
+  }) async {
+    final response = await _dio.post('/api/v1/appointments', data: {
+      'petId': petId,
+      'appointmentType': appointmentType,
+      'scheduledStart': scheduledStart.toUtc().toIso8601String(),
+      'scheduledEnd': scheduledEnd.toUtc().toIso8601String(),
+      'reason': ?reason,
+      'veterinarianId': ?veterinarianId,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> cancelAppointment(String id) async {
+    final response = await _dio.delete('/api/v1/appointments/$id');
+    return response.data as Map<String, dynamic>;
+  }
+
   Dio get dio => _dio;
 }
 

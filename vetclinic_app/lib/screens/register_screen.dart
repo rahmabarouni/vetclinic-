@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
+import '../theme/app_theme.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -63,7 +64,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             key: _formKey,
             child: Column(
               children: [
-                const Icon(Icons.person_add, size: 60, color: Color(0xFF4CAF50)),
+                const Icon(Icons.person_add, size: 60, color: AppColors.primary),
                 const SizedBox(height: 24),
                 Row(
                   children: [
@@ -172,7 +173,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ? null
                         : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                     ),
                     child: authState.status == AuthStatus.loading

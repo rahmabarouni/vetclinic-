@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
+import 'screens/pets_list_screen.dart';
+import 'screens/appointments_list_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   runApp(const ProviderScope(child: VetClinicApp()));
@@ -17,15 +20,12 @@ class VetClinicApp extends ConsumerWidget {
     return MaterialApp(
       title: 'VetClinic',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4CAF50)),
-        useMaterial3: true,
-      ),
-      home: _buildHome(authState),
+      theme: AppTheme.light,
+      home: _buildHome(authState, ref),
     );
   }
 
-  Widget _buildHome(AuthState authState) {
+  Widget _buildHome(AuthState authState, WidgetRef ref) {
     switch (authState.status) {
       case AuthStatus.loading:
       case AuthStatus.initial:
@@ -33,14 +33,80 @@ class VetClinicApp extends ConsumerWidget {
           body: Center(child: CircularProgressIndicator()),
         );
       case AuthStatus.authenticated:
-        return const Scaffold(
-          body: Center(
-            child: Text('Bienvenue ! (Dashboard à venir)'),
-          ),
-        );
+        return const HomeScreen();
       case AuthStatus.unauthenticated:
       case AuthStatus.error:
         return const LoginScreen();
     }
+  }
+}
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _currentIndex = 0;
+
+  final _screens = const [
+    PetsListScreen(),
+    AppointmentsListScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('VetClinic'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Se déconnecter',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Déconnexion'),
+                  content: const Text('Voulez-vous vous déconnecter ?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Annuler'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        ProviderScope.containerOf(context).read(authProvider.notifier).logout();
+                      },
+                      child: const Text('Déconnecter', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: _screens[_currentIndex],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.pets_outlined),
+            selectedIcon: Icon(Icons.pets),
+            label: 'Animaux',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.event_outlined),
+            selectedIcon: Icon(Icons.event),
+            label: 'RDV',
+          ),
+        ],
+      ),
+    );
   }
 }
