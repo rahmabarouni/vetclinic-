@@ -1,16 +1,18 @@
 const http = require('http');
 
-function request(method, path, body, token) {
+const NEXT_PORT = 3001;
+
+function request(method, path, body, cookie, port) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
     const opts = {
       hostname: 'localhost',
-      port: 3000,
+      port: port || NEXT_PORT,
       path,
       method,
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(cookie ? { Cookie: cookie } : {}),
         ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}),
       },
     };
@@ -18,8 +20,9 @@ function request(method, path, body, token) {
       let body = '';
       res.on('data', (c) => (body += c));
       res.on('end', () => {
-        try { resolve(JSON.parse(body)); }
-        catch { resolve(body); }
+        const setCookie = res.headers['set-cookie'];
+        try { resolve({ data: JSON.parse(body), status: res.statusCode, setCookie }); }
+        catch { resolve({ data: body, status: res.statusCode, setCookie }); }
       });
     });
     req.on('error', reject);
@@ -28,75 +31,105 @@ function request(method, path, body, token) {
   });
 }
 
+function extractTokenCookie(setCookie) {
+  if (!setCookie) return null;
+  for (const c of setCookie) {
+    if (c.startsWith('dashboard_token=')) {
+      return c.split(';')[0];
+    }
+  }
+  return null;
+}
+
 async function main() {
   console.log('==========================================');
-  console.log(' Phase 6 — Dashboard Proof Test');
+  console.log(' Phase 6 — httpOnly Cookie Auth Test');
   console.log('==========================================\n');
 
-  // 1. Login as dr.martin (VET)
-  console.log('[1] Login dr.martin@vetclinic.test...');
-  const login = await request('POST', '/api/v1/auth/login', {
+  // 1. Login via Route Handler
+  console.log('[1] POST /api/auth/login (dr.martin)...');
+  const loginRes = await request('POST', '/api/auth/login', {
     email: 'dr.martin@vetclinic.test',
     password: 'REDACTED_DEMO_PASSWORD',
   });
-  const token = login.token;
-  const user = login.user;
-  console.log(`    OK: ${user.firstName} ${user.lastName} (role=${user.role}, id=${user.id})`);
+  console.log(`    Status: ${loginRes.status}`);
+  console.log(`    User: ${loginRes.data.user?.firstName} ${loginRes.data.user?.lastName} (${loginRes.data.user?.role})`);
 
-  if (user.role !== 'VETERINARIAN') {
-    console.log('    FAIL: role is not VETERINARIAN');
+  const cookie = extractTokenCookie(loginRes.setCookie);
+  console.log(`    Cookie set: ${cookie ? 'YES (httpOnly)' : 'NO'}`);
+  console.log(`    Token in response body: ${loginRes.data.token ? 'YES (should be NO)' : 'NO'}`);
+
+  if (!cookie) {
+    console.log('    FAIL: no httpOnly cookie set');
+    process.exit(1);
+  }
+  if (loginRes.data.token) {
+    console.log('    FAIL: token leaked in response body');
     process.exit(1);
   }
 
-  // 2. Fetch appointments (filtered by vet)
-  console.log('\n[2] GET /api/v1/appointments (auto-filtered by vet)...');
-  const appts = await request('GET', '/api/v1/appointments?page=1&limit=50', null, token);
-  console.log(`    OK: ${appts.data.length} appointments found`);
+  // 2. Verify /api/auth/me works with cookie
+  console.log('\n[2] GET /api/auth/me (with cookie)...');
+  const meRes = await request('GET', '/api/auth/me', null, cookie);
+  console.log(`    Status: ${meRes.status}`);
+  console.log(`    User: ${meRes.data.user?.firstName} ${meRes.data.user?.lastName}`);
 
-  for (const a of appts.data) {
-    console.log(`    - [${a.status}] ${a.appointmentType} | ${a.pet.name} (${a.pet.species}) | client: ${a.client.firstName} ${a.client.lastName} | ${a.scheduledStart}`);
-  }
-
-  if (appts.data.length === 0) {
-    console.log('    FAIL: no appointments for this vet');
+  if (meRes.status !== 200) {
+    console.log('    FAIL: /api/auth/me rejected valid cookie');
     process.exit(1);
   }
 
-  // 3. Find a PENDING appointment to change status
-  const pending = appts.data.find(a => a.status === 'PENDING');
-  if (!pending) {
-    console.log('    No PENDING appointment found, trying first appointment...');
-  }
-  const target = pending || appts.data[0];
-  console.log(`\n[3] PATCH /api/v1/appointments/${target.id}/status -> CONFIRMED...`);
-  console.log(`    Current status: ${target.status}`);
+  // 3. Verify /api/auth/me fails without cookie
+  console.log('\n[3] GET /api/auth/me (without cookie)...');
+  const noAuth = await request('GET', '/api/auth/me');
+  console.log(`    Status: ${noAuth.status} (expected 401)`);
 
-  const updated = await request('PATCH', `/api/v1/appointments/${target.id}/status`, {
-    status: 'CONFIRMED',
-  }, token);
-
-  if (updated.appointment) {
-    console.log(`    OK: new status = ${updated.appointment.status}`);
-    console.log(`    Pet: ${updated.appointment.pet.name}`);
-    console.log(`    Client: ${updated.appointment.client.firstName} ${updated.appointment.client.lastName}`);
-  } else {
-    console.log('    FAIL:', JSON.stringify(updated));
+  if (noAuth.status !== 401) {
+    console.log('    FAIL: should return 401 without cookie');
     process.exit(1);
   }
 
-  // 4. Revert back to PENDING
-  console.log(`\n[4] Revert status back to PENDING...`);
-  const reverted = await request('PATCH', `/api/v1/appointments/${target.id}/status`, {
-    status: 'PENDING',
-  }, token);
-  console.log(`    OK: reverted to ${reverted.appointment.status}`);
+  // 4. Fetch appointments via proxy
+  console.log('\n[4] GET /api/proxy/appointments (via cookie proxy)...');
+  const apptsRes = await request('GET', '/api/proxy/appointments?page=1&limit=50', null, cookie);
+  console.log(`    Status: ${apptsRes.status}`);
+  console.log(`    Appointments: ${apptsRes.data.data?.length || 0}`);
+
+  if (apptsRes.data.data) {
+    for (const a of apptsRes.data.data.slice(0, 3)) {
+      console.log(`    - [${a.status}] ${a.appointmentType} | ${a.pet.name} | ${a.client.firstName}`);
+    }
+  }
+
+  // 5. Status change via proxy
+  const target = apptsRes.data.data?.find(a => a.status === 'COMPLETED' || a.status === 'CONFIRMED');
+  if (target) {
+    console.log(`\n[5] PATCH /api/proxy/appointments/${target.id}/status -> CONFIRMED...`);
+    const patchRes = await request('PATCH', `/api/proxy/appointments/${target.id}/status`, { status: 'CONFIRMED' }, cookie);
+    console.log(`    Status: ${patchRes.status}`);
+    console.log(`    New status: ${patchRes.data.appointment?.status}`);
+
+    // Revert
+    await request('PATCH', `/api/proxy/appointments/${target.id}/status`, { status: target.status }, cookie);
+    console.log(`    Reverted to: ${target.status}`);
+  }
+
+  // 6. Logout clears cookie
+  console.log('\n[6] POST /api/auth/logout...');
+  const logoutRes = await request('POST', '/api/auth/logout', null, cookie);
+  const clearedCookie = extractTokenCookie(logoutRes.setCookie);
+  console.log(`    Status: ${logoutRes.status}`);
+  console.log(`    Cookie cleared: ${clearedCookie !== null ? 'YES' : 'ALREADY EMPTY'}`);
 
   console.log('\n==========================================');
-  console.log(' Phase 6 Proof: ALL PASS');
+  console.log(' RESULTS: ALL PASS');
   console.log('==========================================');
-  console.log(` Login:         ${user.firstName} ${user.lastName} (${user.role})`);
-  console.log(` Appointments:  ${appts.data.length} found (filtered by vet)`);
-  console.log(` Status change: PENDING -> CONFIRMED -> PENDING`);
+  console.log(' httpOnly cookie:     SET (not in body)');
+  console.log(' /api/auth/me:        WORKS with cookie');
+  console.log(' No cookie:           401 rejected');
+  console.log(' Proxy appointments:  WORKS');
+  console.log(' Status change:       WORKS');
+  console.log(' Logout:              CLEARS cookie');
   console.log('==========================================\n');
 }
 

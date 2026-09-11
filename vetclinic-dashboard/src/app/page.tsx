@@ -5,14 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 
 export default function Home() {
-  const { token, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading) {
-      router.replace(token ? '/dashboard' : '/login');
+      router.replace(user ? '/dashboard' : '/login');
     }
-  }, [token, loading, router]);
+  }, [user, loading, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

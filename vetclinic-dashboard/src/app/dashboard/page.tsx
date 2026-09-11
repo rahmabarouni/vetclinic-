@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-import { apiGetAppointments, apiUpdateStatus, Appointment } from '@/lib/api';
+import { Appointment, PaginatedResponse } from '@/lib/api';
 
 const STATUS_OPTIONS = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const;
 
@@ -39,7 +39,7 @@ function formatDate(iso: string) {
 }
 
 export default function DashboardPage() {
-  const { user, token, logout } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,16 +47,17 @@ export default function DashboardPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !token) {
+    if (!loading && !user) {
       router.push('/login');
     }
-  }, [token, loading, router]);
+  }, [user, loading, router]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!user) return;
     setLoading(true);
-    apiGetAppointments(token)
-      .then((data) => {
+    fetch('/api/proxy/appointments?page=1&limit=50')
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Erreur ${res.status}`))))
+      .then((data: PaginatedResponse<Appointment>) => {
         setAppointments(data.data);
         setLoading(false);
       })
@@ -64,15 +65,23 @@ export default function DashboardPage() {
         setError(err.message);
         setLoading(false);
       });
-  }, [token]);
+  }, [user]);
 
   const handleStatusChange = async (appointmentId: string, newStatus: string) => {
-    if (!token) return;
     setUpdatingId(appointmentId);
     try {
-      const result = await apiUpdateStatus(token, appointmentId, newStatus);
+      const res = await fetch(`/api/proxy/appointments/${appointmentId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Erreur ${res.status}`);
+      }
+      const data = await res.json();
       setAppointments((prev) =>
-        prev.map((a) => (a.id === appointmentId ? result.appointment : a))
+        prev.map((a) => (a.id === appointmentId ? data.appointment : a))
       );
     } catch (err: any) {
       setError(err.message);
@@ -89,7 +98,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!token || !user) return null;
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">

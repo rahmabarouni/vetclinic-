@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE = process.env.BACKEND_URL || 'http://localhost:3000';
 
 export interface User {
   id: string;
@@ -34,7 +34,7 @@ export interface PaginatedResponse<T> {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
-export async function apiLogin(email: string, password: string): Promise<{ token: string; user: User }> {
+export async function backendLogin(email: string, password: string): Promise<{ token: string; user: User }> {
   const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -47,27 +47,18 @@ export async function apiLogin(email: string, password: string): Promise<{ token
   return res.json();
 }
 
-export async function apiGetAppointments(token: string): Promise<PaginatedResponse<Appointment>> {
-  const res = await fetch(`${API_BASE}/api/v1/appointments?page=1&limit=50`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error(`Failed to load appointments (${res.status})`);
-  return res.json();
-}
-
-export async function apiUpdateStatus(
-  token: string,
-  appointmentId: string,
-  status: string
-): Promise<{ appointment: Appointment }> {
-  const res = await fetch(`${API_BASE}/api/v1/appointments/${appointmentId}/status`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status }),
+export async function backendFetch(token: string, path: string, init?: RequestInit): Promise<any> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...init?.headers,
+    },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Status update failed (${res.status})`);
+    throw new Error(err.error || `Request failed (${res.status})`);
   }
   return res.json();
 }
