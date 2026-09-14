@@ -49,6 +49,7 @@ export async function buildApp() {
           },
         },
       },
+      security: [{ bearerAuth: [] }],
     },
   });
   await fastify.register(swaggerUi, { routePrefix: "/docs" });
