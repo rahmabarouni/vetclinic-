@@ -20,7 +20,21 @@ const changePasswordSchema = z.object({
 });
 
 export default async function authRoutes(fastify: FastifyInstance) {
-  fastify.post("/auth/register", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+  fastify.post("/auth/register", {
+    config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+    schema: {
+      body: {
+        type: "object",
+        required: ["email", "password", "firstName", "lastName"],
+        properties: {
+          email: { type: "string", format: "email" },
+          password: { type: "string", minLength: 8 },
+          firstName: { type: "string", minLength: 1 },
+          lastName: { type: "string", minLength: 1 },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = registerSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
@@ -42,7 +56,19 @@ export default async function authRoutes(fastify: FastifyInstance) {
     return reply.code(201).send({ user, token });
   });
 
-  fastify.post("/auth/login", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+  fastify.post("/auth/login", {
+    config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+    schema: {
+      body: {
+        type: "object",
+        required: ["email", "password"],
+        properties: {
+          email: { type: "string", format: "email" },
+          password: { type: "string", minLength: 1 },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
@@ -66,7 +92,19 @@ export default async function authRoutes(fastify: FastifyInstance) {
     });
   });
 
-  fastify.post("/auth/change-password", { preHandler: [fastify.authenticate] }, async (request, reply) => {
+  fastify.post("/auth/change-password", {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: {
+        type: "object",
+        required: ["currentPassword", "newPassword"],
+        properties: {
+          currentPassword: { type: "string", minLength: 1 },
+          newPassword: { type: "string", minLength: 8 },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = changePasswordSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
