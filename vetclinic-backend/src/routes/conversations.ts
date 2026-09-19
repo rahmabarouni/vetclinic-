@@ -267,7 +267,20 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
     return reply.send({ conversation, ...paginatedResponse(messages, msgTotal, msgPagination.page, msgPagination.limit) });
   });
 
-  fastify.post("/conversations/:id/messages", async (request, reply) => {
+  fastify.post("/conversations/:id/messages", {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: {
+        type: "object",
+        required: ["content"],
+        properties: {
+          content: { type: "string", minLength: 1 },
+          attachmentUrl: { type: "string", format: "uri" },
+          attachmentType: { type: "string", enum: ["IMAGE", "DOCUMENT"] },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsedParams = z.object({ id: z.string().uuid() }).safeParse(request.params);
     if (!parsedParams.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsedParams.error.flatten() });
