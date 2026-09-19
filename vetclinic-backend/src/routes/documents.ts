@@ -65,6 +65,19 @@ export default async function documentsRoutes(fastify: FastifyInstance) {
     "/documents",
     {
       preHandler: [fastify.authorize(["VETERINARIAN", "ADMIN", "STAFF"])],
+      schema: {
+        body: {
+          type: "object",
+          required: ["petId", "fileUrl", "fileType", "title"],
+          properties: {
+            petId: { type: "string", format: "uuid" },
+            medicalRecordId: { type: "string", format: "uuid", nullable: true },
+            fileUrl: { type: "string", format: "uri" },
+            fileType: { type: "string", enum: ["XRAY", "LAB_RESULT", "PRESCRIPTION", "PHOTO", "OTHER"] },
+            title: { type: "string", minLength: 1 },
+          },
+        },
+      },
     },
     async (request, reply) => {
       const parsed = createDocumentSchema.safeParse(request.body);
