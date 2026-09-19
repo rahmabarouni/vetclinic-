@@ -144,6 +144,14 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
     "/conversations",
     {
       preHandler: [fastify.authorize(["CLIENT"])],
+      schema: {
+        body: {
+          type: "object",
+          properties: {
+            veterinarianId: { type: "string", format: "uuid", nullable: true },
+          },
+        },
+      },
     },
     async (request, reply) => {
       const parsed = createConversationSchema.safeParse(request.body);
