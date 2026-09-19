@@ -47,7 +47,21 @@ export default async function timeSlotBlockRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
   fastify.addHook("preHandler", fastify.authorize(["VETERINARIAN", "ADMIN", "STAFF"]));
 
-  fastify.post("/time-slot-blocks", async (request, reply) => {
+  fastify.post("/time-slot-blocks", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["veterinarianId", "startDatetime", "endDatetime"],
+        properties: {
+          veterinarianId: { type: "string", format: "uuid" },
+          startDatetime: { type: "string", format: "date-time" },
+          endDatetime: { type: "string", format: "date-time" },
+          reason: { type: "string" },
+          isRecurring: { type: "boolean" },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = createTimeSlotBlockSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
