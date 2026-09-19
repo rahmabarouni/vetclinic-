@@ -83,7 +83,23 @@ export default async function medicalRecordsRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
   fastify.addHook("preHandler", fastify.authorize(["VETERINARIAN", "ADMIN", "STAFF"]));
 
-  fastify.post("/medical-records", async (request, reply) => {
+  fastify.post("/medical-records", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["petId", "veterinarianId", "recordType", "title"],
+        properties: {
+          petId: { type: "string", format: "uuid" },
+          appointmentId: { type: "string", format: "uuid", nullable: true },
+          veterinarianId: { type: "string", format: "uuid" },
+          recordType: { type: "string", enum: ["CONSULTATION", "VACCINATION", "SURGERY", "TREATMENT", "ALLERGY", "OTHER"] },
+          title: { type: "string", minLength: 1 },
+          description: { type: "string" },
+          diagnosis: { type: "string" },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = createMedicalRecordSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
