@@ -41,7 +41,21 @@ export default async function petsRoutes(fastify: FastifyInstance) {
     return reply.send(paginatedResponse(pets, total, page, limit));
   });
 
-  fastify.post("/pets", async (request, reply) => {
+  fastify.post("/pets", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["name", "species"],
+        properties: {
+          name: { type: "string", minLength: 1, examples: ["Rex"] },
+          species: { type: "string", enum: ["DOG", "CAT", "BIRD", "RABBIT", "RODENT", "REPTILE", "OTHER"], examples: ["DOG"] },
+          breed: { type: "string", examples: ["Berger Allemand"] },
+          sex: { type: "string", enum: ["MALE", "FEMALE", "UNKNOWN"] },
+          weightKg: { type: "number", examples: [25] },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const { userId } = request.user;
     const parsed = createPetSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -55,7 +69,20 @@ export default async function petsRoutes(fastify: FastifyInstance) {
     return reply.code(201).send({ pet });
   });
 
-  fastify.patch("/pets/:id", async (request, reply) => {
+  fastify.patch("/pets/:id", {
+    schema: {
+      body: {
+        type: "object",
+        properties: {
+          name: { type: "string", minLength: 1 },
+          species: { type: "string", enum: ["DOG", "CAT", "BIRD", "RABBIT", "RODENT", "REPTILE", "OTHER"] },
+          breed: { type: "string" },
+          sex: { type: "string", enum: ["MALE", "FEMALE", "UNKNOWN"] },
+          weightKg: { type: "number", minimum: 0 },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsedParams = z.object({ id: z.string().uuid() }).safeParse(request.params);
     if (!parsedParams.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsedParams.error.flatten() });
