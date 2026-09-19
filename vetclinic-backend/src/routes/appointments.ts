@@ -127,7 +127,22 @@ async function veterinarianHasAvailabilityConflict(
 export default async function appointmentsRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
 
-  fastify.post("/appointments", async (request, reply) => {
+  fastify.post("/appointments", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["petId", "veterinarianId", "appointmentType", "scheduledStart", "scheduledEnd"],
+        properties: {
+          petId: { type: "string", format: "uuid" },
+          veterinarianId: { type: "string", format: "uuid", nullable: true },
+          appointmentType: { type: "string", enum: ["CONSULTATION", "VACCINATION", "SURGERY", "EMERGENCY", "CHECKUP", "GROOMING", "OTHER"] },
+          scheduledStart: { type: "string", format: "date-time" },
+          scheduledEnd: { type: "string", format: "date-time" },
+          reason: { type: "string" },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = createAppointmentSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
