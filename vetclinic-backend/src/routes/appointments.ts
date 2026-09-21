@@ -260,6 +260,15 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
     "/appointments/:id/status",
     {
       preHandler: [fastify.authorize(["VETERINARIAN", "ADMIN", "STAFF"])],
+      schema: {
+        body: {
+          type: "object",
+          required: ["status"],
+          properties: {
+            status: { type: "string", enum: ["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED", "NO_SHOW"] },
+          },
+        },
+      },
     },
     async (request, reply) => {
       const parsedBody = updateAppointmentStatusSchema.safeParse(request.body);

@@ -116,3 +116,87 @@ C'est tout — 3 commandes après avoir ouvert Docker Desktop.
 ## Astuce pour aller plus vite : configurer Docker Desktop au démarrage de Windows
 
 Dans Docker Desktop → **Settings (⚙️) → General** → coche **"Start Docker Desktop when you sign in to your computer"**. Ainsi, Docker (et donc ta base de données) sera prêt automatiquement à chaque allumage du PC, et tu n'auras plus que les étapes 2 et 3 à faire.
+
+
+The user wants me to explain how to test the app (Flutter mobile), backend, and back office (Next.js dashboard) without touching the code. They want simple, easy-to-understand instructions.
+
+Let me provide clear testing instructions for each component.
+
+Guide de test — App, Backend, Back Office
+1. Backend (API)
+Démarrer :
+
+# Terminal 1 : PostgreSQL + MinIO
+cd vetclinic-backend
+docker-compose up -d
+
+# Terminal 2 : Backend
+npx prisma migrate deploy
+npx tsx prisma/seed.ts
+npm run build
+node dist/server.js
+Tester manuellement (navigateur ou Postman) :
+
+Test	URL	Méthode	Résultat attendu
+Santé	http://localhost:3000/health	GET	{"status":"ok"}
+Login	http://localhost:3000/api/v1/auth/login	POST	Body: {"email":"dr.martin@vetclinic.test","password":"REDACTED_DEMO_PASSWORD"} → Retourne un token JWT
+Profil	http://localhost:3000/api/v1/users/profile	GET	Header: Authorization: Bearer <token> → Infos utilisateur
+RDV	http://localhost:3000/api/v1/appointments	GET	Header: Authorization: Bearer <token> → Liste des RDV
+Changer statut	http://localhost:3000/api/v1/appointments/<id>/status	PATCH	Body: {"status":"CONFIRMED"} → RDV mis à jour
+Swagger (documentation interactive) :
+
+Ouvrir http://localhost:3000/docs dans le navigateur
+Toutes les routes sont documentées avec les paramètres
+2. Back Office (Dashboard Next.js)
+Démarrer :
+
+# Terminal 3 (après le backend)
+cd vetclinic-dashboard
+npm run dev
+Tester :
+
+Ouvrir http://localhost:3001 dans le navigateur
+Se connecter avec :
+Email : dr.martin@vetclinic.test
+Mot de passe : REDACTED_DEMO_PASSWORD
+Vérifier :
+✅ Redirigé vers /dashboard (pas de token visible dans l'URL)
+✅ Liste des RDV affichée avec les noms des animaux et propriétaires
+✅ Sélecteur de statut fonctionne (cliquer pour changer PENDING → CONFIRMED)
+✅ Déconnexion vide le cookie et redirige vers /login
+Vérifier que le token est httpOnly :
+
+Ouvrir les outils de développement (F12)
+Onglet Application → Cookies → localhost:3001
+Voir dashboard_token avec le drapeau HttpOnly coché
+Onglet Console : taper document.cookie → le token n'apparaît PAS
+3. App Mobile (Flutter)
+Démarrer :
+
+# Activer Docker (PostgreSQL + MinIO + Backend déjà lancés)
+# Puis :
+cd vetclinic_app
+flutter pub get
+flutter run
+Tester sur émulateur ou téléphone :
+
+Test	Comment	Résultat attendu
+Login	Entrer jean.dupont@email.test / REDACTED_DEMO_PASSWORD	Redirigé vers l'écran d'accueil
+Liste animaux	Onglet "Pets"	Voir Rex, Luna, Mimi...
+Détail animal	Cliquer sur un animal	Espèce, race, sexe, poids affichés
+Chat	Onglet "Messages"	Liste des conversations
+Envoyer message	Taper un message et envoyer	Le message apparaît en temps réel (bulle verte)
+Déconnexion	Bouton Logout	Retour à l'écran de login
+Tester le WebSocket (chat temps réel) :
+
+Ouvrir l'app sur 2 émulateurs différents
+Se connecter avec 2 utilisateurs différents
+Envoyer un message depuis l'un → il apparaît immédiatement sur l'autre
+Résumé des comptes de test
+Rôle	Email	Mot de passe
+Vétérinaire	dr.martin@vetclinic.test	REDACTED_DEMO_PASSWORD
+Vétérinaire	dr.durand@vetclinic.test	REDACTED_DEMO_PASSWORD
+Admin	admin@vetclinic.test	REDACTED_DEMO_PASSWORD
+Client	jean.dupont@email.test	REDACTED_DEMO_PASSWORD
+Client	marie.leroy@email.test	REDACTED_DEMO_PASSWORD
+Client	pierre.moreau@email.test	REDACTED_DEMO_PASSWORD

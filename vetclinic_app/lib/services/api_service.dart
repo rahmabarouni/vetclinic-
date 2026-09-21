@@ -144,7 +144,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> createConversation({String? veterinarianId}) async {
     final response = await _dio.post('/api/v1/conversations', data: {
-      if (veterinarianId != null) 'veterinarianId': veterinarianId,
+      'veterinarianId': ?veterinarianId,
     });
     return response.data as Map<String, dynamic>;
   }
@@ -158,8 +158,8 @@ class ApiService {
   Future<Map<String, dynamic>> sendMessage(String conversationId, {String? content, String? attachmentUrl, String? attachmentType}) async {
     final response = await _dio.post('/api/v1/conversations/$conversationId/messages', data: {
       if (content != null && content.isNotEmpty) 'content': content,
-      if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
-      if (attachmentType != null) 'attachmentType': attachmentType,
+      'attachmentUrl': ?attachmentUrl,
+      'attachmentType': ?attachmentType,
     });
     return response.data as Map<String, dynamic>;
   }
