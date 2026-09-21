@@ -39,7 +39,19 @@ export default async function usersRoutes(fastify: FastifyInstance) {
     return reply.send({ user });
   });
 
-  fastify.put("/users/profile", async (request, reply) => {
+  fastify.put("/users/profile", {
+    schema: {
+      body: {
+        type: "object",
+        properties: {
+          firstName: { type: "string", minLength: 1 },
+          lastName: { type: "string", minLength: 1 },
+          phone: { type: "string" },
+          address: { type: "string" },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = updateProfileSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
