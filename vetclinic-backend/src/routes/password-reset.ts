@@ -13,7 +13,17 @@ const resetPasswordSchema = z.object({
 });
 
 export default async function passwordResetRoutes(fastify: FastifyInstance) {
-  fastify.post("/auth/forgot-password", async (request, reply) => {
+  fastify.post("/auth/forgot-password", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["email"],
+        properties: {
+          email: { type: "string", format: "email" },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = forgotPasswordSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
