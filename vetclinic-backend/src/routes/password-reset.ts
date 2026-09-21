@@ -50,7 +50,18 @@ export default async function passwordResetRoutes(fastify: FastifyInstance) {
     return reply.send({ message: "Si cet email existe, un lien de réinitialisation a été envoyé." });
   });
 
-  fastify.post("/auth/reset-password", async (request, reply) => {
+  fastify.post("/auth/reset-password", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["token", "newPassword"],
+        properties: {
+          token: { type: "string", minLength: 1 },
+          newPassword: { type: "string", minLength: 8 },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = resetPasswordSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
