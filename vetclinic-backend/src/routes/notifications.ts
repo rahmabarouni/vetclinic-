@@ -112,7 +112,17 @@ export default async function notificationsRoutes(fastify: FastifyInstance) {
     return reply.send({ message: "Notification supprimée." });
   });
 
-  fastify.patch("/notifications/mark-read", async (request, reply) => {
+  fastify.patch("/notifications/mark-read", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["ids"],
+        properties: {
+          ids: { type: "array", items: { type: "string", format: "uuid" }, minItems: 1 },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = z.object({ ids: z.array(z.string().uuid()).min(1) }).safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
