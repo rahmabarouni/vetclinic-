@@ -37,7 +37,23 @@ export default async function veterinariansRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
   fastify.addHook("preHandler", fastify.authorize(["ADMIN"]));
 
-  fastify.post("/veterinarians", async (request, reply) => {
+  fastify.post("/veterinarians", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["email", "password", "firstName", "lastName"],
+        properties: {
+          email: { type: "string", format: "email" },
+          password: { type: "string", minLength: 8 },
+          firstName: { type: "string", minLength: 1 },
+          lastName: { type: "string", minLength: 1 },
+          phone: { type: "string" },
+          specialty: { type: "string" },
+          bio: { type: "string" },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const parsed = createVeterinarianSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
