@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'register_screen.dart';
@@ -30,6 +31,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _emailController.text.trim(),
             _passwordController.text,
           );
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    try {
+      final gsi = GoogleSignIn.instance;
+      await gsi.initialize();
+      final googleUser = await gsi.authenticate();
+      final idToken = googleUser.authentication.idToken;
+      if (idToken == null) return;
+      await ref.read(authProvider.notifier).loginWithGoogle(idToken: idToken);
+    } catch (e) {
+      // Les erreurs sont affichées via le listener sur authProvider.
     }
   }
 
@@ -130,6 +144,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                           )
                         : const Text('Se connecter'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'ou',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: authState.status == AuthStatus.loading
+                        ? null
+                        : _handleGoogleSignIn,
+                    icon: const Icon(Icons.g_mobiledata, size: 28, color: Color(0xFF4285F4)),
+                    label: const Text('Continuer avec Google'),
                   ),
                 ),
                 const SizedBox(height: 16),

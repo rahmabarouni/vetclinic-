@@ -61,6 +61,15 @@ class ApiService {
     await clearToken();
   }
 
+  Future<Map<String, dynamic>> loginWithGoogle({required String idToken}) async {
+    final response = await _dio.post('/api/v1/auth/google', data: {
+      'idToken': idToken,
+    });
+    final data = response.data as Map<String, dynamic>;
+    await setToken(data['token'] as String);
+    return data;
+  }
+
   Future<Map<String, dynamic>> verifyEmail({
     required String email,
     required String code,

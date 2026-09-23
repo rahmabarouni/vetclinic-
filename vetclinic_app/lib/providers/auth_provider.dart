@@ -95,6 +95,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> loginWithGoogle({required String idToken}) async {
+    state = state.copyWith(status: AuthStatus.loading, error: null);
+    try {
+      final data = await _api.loginWithGoogle(idToken: idToken);
+      final user = User.fromJson(data['user'] as Map<String, dynamic>);
+      state = state.copyWith(status: AuthStatus.authenticated, user: user);
+    } catch (e) {
+      String message = 'Connexion Google impossible';
+      if (e.toString().contains('401')) {
+        message = 'Connexion Google refusée';
+      } else if (e.toString().contains('403')) {
+        message = 'Cet email est déjà utilisé avec un compte classique';
+      } else if (e.toString().contains('429')) {
+        message = 'Trop de tentatives. Réessayez dans 1 minute.';
+      } else if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused')) {
+        message = 'Impossible de se connecter au serveur';
+      }
+      state = state.copyWith(status: AuthStatus.error, error: message);
+    }
+  }
+
   Future<void> logout() async {
     await _api.logout();
     state = AuthState(status: AuthStatus.unauthenticated);
