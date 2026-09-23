@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'email_verification_screen.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -29,14 +30,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
-      ref.read(authProvider.notifier).register(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
-            firstName: _firstNameController.text.trim(),
-            lastName: _lastNameController.text.trim(),
-          );
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final email = _emailController.text.trim();
+    await ref.read(authProvider.notifier).register(
+          email: email,
+          password: _passwordController.text,
+          firstName: _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim(),
+        );
+
+    if (!mounted) return;
+    final authState = ref.read(authProvider);
+    if (authState.status == AuthStatus.authenticated && authState.error == null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EmailVerificationScreen(email: email),
+        ),
+      );
     }
   }
 
@@ -49,9 +62,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(next.error!), backgroundColor: Colors.red),
         );
-      }
-      if (next.status == AuthStatus.authenticated) {
-        Navigator.pop(context);
       }
     });
 

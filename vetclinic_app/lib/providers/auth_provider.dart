@@ -99,6 +99,40 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _api.logout();
     state = AuthState(status: AuthStatus.unauthenticated);
   }
+
+  Future<String?> verifyEmail({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      await _api.verifyEmail(email: email, code: code);
+      return null;
+    } catch (e) {
+      return _mapVerificationError(e);
+    }
+  }
+
+  Future<String?> resendVerification({required String email}) async {
+    try {
+      await _api.resendVerification(email: email);
+      return null;
+    } catch (e) {
+      return _mapVerificationError(e);
+    }
+  }
+
+  String _mapVerificationError(Object e) {
+    final message = e.toString();
+    if (message.contains('400')) return 'Code invalide ou email déjà vérifié';
+    if (message.contains('401')) return 'Session expirée, reconnectez-vous';
+    if (message.contains('404')) return 'Utilisateur introuvable';
+    if (message.contains('429')) return 'Trop de demandes, patientez un instant';
+    if (message.contains('SocketException') ||
+        message.contains('Connection refused')) {
+      return 'Impossible de se connecter au serveur';
+    }
+    return 'Erreur de vérification';
+  }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {

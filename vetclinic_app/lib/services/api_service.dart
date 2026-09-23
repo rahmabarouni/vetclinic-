@@ -61,6 +61,24 @@ class ApiService {
     await clearToken();
   }
 
+  Future<Map<String, dynamic>> verifyEmail({
+    required String email,
+    required String code,
+  }) async {
+    final response = await _dio.post('/api/v1/auth/verify-email', data: {
+      'email': email,
+      'code': code,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> resendVerification({required String email}) async {
+    final response = await _dio.post('/api/v1/auth/resend-verification', data: {
+      'email': email,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getPets({int page = 1, int limit = 20, String? search}) async {
     final queryParams = <String, dynamic>{'page': page, 'limit': limit};
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
