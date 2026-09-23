@@ -14,6 +14,11 @@ enum UserRole {
   STAFF
 }
 
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
 model User {
   id                  String         @id @default(uuid())
   email               String         @unique
@@ -24,6 +29,8 @@ model User {
   lastName            String         @map("last_name")
   address             String?
   isActive            Boolean        @default(true) @map("is_active")
+  emailVerified       Boolean        @default(false) @map("email_verified")
+  authProvider        AuthProvider   @default(LOCAL) @map("auth_provider")
   createdAt           DateTime       @default(now()) @map("created_at")
   updatedAt           DateTime       @updatedAt @map("updated_at")
   pets                Pet[]
@@ -35,6 +42,7 @@ model User {
   notifications       Notification[] @relation("NotificationRecipient")
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
+  emailVerificationCodes EmailVerificationCode[]
 
   @@map("users")
 }
@@ -326,5 +334,20 @@ model PasswordResetToken {
 
   @@index([userId])
   @@index([token])
-  @@map("password_reset_tokens")
+   @@map("password_reset_tokens")
+}
+
+model EmailVerificationCode {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  code      String
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([code])
+  @@map("email_verification_codes")
 }
