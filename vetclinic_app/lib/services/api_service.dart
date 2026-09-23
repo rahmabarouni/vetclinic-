@@ -137,6 +137,13 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getVeterinarians({bool availableOnly = false}) async {
+    final response = await _dio.get('/api/v1/veterinarians', queryParameters: {
+      if (availableOnly) 'availableOnly': true,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getConversations({int page = 1, int limit = 20}) async {
     final response = await _dio.get('/api/v1/conversations', queryParameters: {'page': page, 'limit': limit});
     return response.data as Map<String, dynamic>;

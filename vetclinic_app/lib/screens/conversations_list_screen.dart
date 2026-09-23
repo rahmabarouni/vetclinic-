@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/conversation.dart';
+import '../models/veterinarian.dart';
 import '../providers/conversations_provider.dart';
 import '../theme/app_theme.dart';
 import 'chat_screen.dart';
+import 'veterinarian_picker_screen.dart';
 
 class ConversationsListScreen extends ConsumerStatefulWidget {
   const ConversationsListScreen({super.key});
@@ -20,7 +22,41 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
     return Scaffold(
       appBar: AppBar(title: const Text('Messages')),
       body: _buildBody(state),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _startNewConversation,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        tooltip: 'Nouvelle conversation',
+        child: const Icon(Icons.add),
+      ),
     );
+  }
+
+  Future<void> _startNewConversation() async {
+    final Veterinarian? veterinarian = await Navigator.push<Veterinarian>(
+      context,
+      MaterialPageRoute(builder: (_) => const VeterinarianPickerScreen()),
+    );
+    if (veterinarian == null || !mounted) return;
+
+    final conversation = await ref
+        .read(conversationsProvider.notifier)
+        .createConversation(veterinarianId: veterinarian.id);
+
+    if (!mounted) return;
+    if (conversation != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ChatScreen(conversation: conversation)),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur lors de la création de la conversation'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildBody(ConversationsState state) {
