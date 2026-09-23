@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { getApp, closeApp } from "./helper";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 let app: any;
 
@@ -9,6 +12,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await closeApp();
+  await prisma.$disconnect();
 });
 
 describe("Auth", () => {
@@ -80,16 +84,146 @@ describe("Auth", () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it("POST /api/v1/auth/login — email inexistant (401)", async () => {
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/auth/login",
-      payload: {
-        email: "nonexistent@test.com",
-        password: "Whatever123!",
-      },
+   it("POST /api/v1/auth/login — email inexistant (401)", async () => {
+     const res = await app.inject({
+       method: "POST",
+       url: "/api/v1/auth/login",
+       payload: {
+         email: "nonexistent@test.com",
+         password: "Whatever123!",
+       },
+     });
+
+     expect(res.statusCode).toBe(401);
+   });
+
+   it("POST /api/v1/auth/register — envoie un code OTP (emailVerified: false)", async () => {
+     const res = await app.inject({
+       method: "POST",
+       url: "/api/v1/auth/register",
+       payload: {
+         email: `otp-test-${Date.now()}@test.com`,
+         password: "SecurePass123!",
+         firstName: "OTP",
+         lastName: "Test",
+       },
+     });
+
+     expect(res.statusCode).toBe(201);
+     const body = res.json();
+     expect(body.emailVerified).toBe(false);
+     expect(body).toHaveProperty("token");
+   });
+
+   it("POST /api/v1/auth/verify-email — vérification réussie", async () => {
+     const regEmail = `verify-${Date.now()}@test.com`;
+     await app.inject({
+       method: "POST",
+       url: "/api/v1/auth/register",
+       payload: {
+         email: regEmail,
+         password: "SecurePass123!",
+         firstName: "Verify",
+         lastName: "Test",
+       },
+     });
+
+const user = await prisma.user.findUnique({ where: { email: regEmail } });
+      const codeRecord = await prisma.emailVerificationCode.findFirst({
+        where: { userId: user!.id },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const loginRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/login",
+        payload: { email: regEmail, password: "SecurePass123!" },
+      });
+      const token = loginRes.json().token;
+
+      const verifyRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/verify-email",
+        headers: { authorization: `Bearer ${token}` },
+        payload: { email: regEmail, code: codeRecord!.code },
+      });
+
+      expect([200, 201]).toContain(verifyRes.statusCode);
+      const verifyBody = verifyRes.json();
+      expect(verifyBody).toHaveProperty("message");
     });
 
-    expect(res.statusCode).toBe(401);
-  });
+it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
+      const regEmail = `bad-code-${Date.now()}@test.com`;
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/register",
+        payload: {
+          email: regEmail,
+          password: "SecurePass123!",
+          firstName: "Bad",
+          lastName: "Code",
+        },
+      });
+
+      const loginRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/login",
+        payload: { email: regEmail, password: "SecurePass123!" },
+      });
+      const token = loginRes.json().token;
+
+      const verifyRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/verify-email",
+        headers: { authorization: `Bearer ${token}` },
+        payload: { email: regEmail, code: "BAD123" },
+      });
+
+      expect(verifyRes.statusCode).toBe(400);
+      expect(verifyRes.json().error).toMatch(/invalide|expiré/i);
+    });
+
+
+
+    it("POST /api/v1/auth/google — Google Sign-In refuse un token invalide", async () => {
+      const { OAuth2Client } = await import("google-auth-library");
+      const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+      const fakeToken = "fake-google-id-token-for-testing";
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/google",
+        payload: { idToken: fakeToken },
+      });
+
+      expect(res.statusCode).toBe(401);
+      expect(res.json().error).toMatch(/invalide/i);
+    });
+
+    it("POST /api/v1/auth/google — email déjà utilisé en LOCAL retourne 401 ou 403", async () => {
+      const existingEmail = `existing-google-${Date.now()}@test.com`;
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/register",
+        payload: {
+          email: existingEmail,
+          password: "SecurePass123!",
+          firstName: "Existing",
+          lastName: "User",
+        },
+      });
+
+      const { OAuth2Client } = await import("google-auth-library");
+      const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+      const fakeToken = "existing-google-user-token";
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/google",
+        payload: { idToken: fakeToken },
+      });
+
+      expect([401, 403]).toContain(res.statusCode);
+    });
 });

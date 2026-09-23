@@ -35,10 +35,10 @@ const userSelect = {
 
 export default async function veterinariansRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
-  fastify.addHook("preHandler", fastify.authorize(["ADMIN"]));
 
-  fastify.post("/veterinarians", {
-    schema: {
+fastify.post("/veterinarians", {
+      preHandler: [fastify.authorize(["ADMIN"])],
+      schema: {
       body: {
         type: "object",
         required: ["email", "password", "firstName", "lastName"],
