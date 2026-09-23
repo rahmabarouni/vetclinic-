@@ -10,6 +10,7 @@ import prismaPlugin from "./plugins/prisma";
 import authPlugin from "./plugins/auth";
 import minioPlugin from "./plugins/minio";
 import authRoutes from "./routes/auth";
+import emailVerificationRoutes from "./routes/email-verification";
 import petsRoutes from "./routes/pets";
 import appointmentsRoutes from "./routes/appointments";
 import timeSlotBlockRoutes from "./routes/time-slot-blocks";
@@ -59,6 +60,7 @@ export async function buildApp() {
   await fastify.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
   await fastify.register(rateLimit, { max: 100, timeWindow: "1 minute" });
   await fastify.register(authRoutes, { prefix: "/api/v1" });
+  await fastify.register(emailVerificationRoutes, { prefix: "/api/v1" });
   await fastify.register(petsRoutes, { prefix: "/api/v1" });
   await fastify.register(appointmentsRoutes, { prefix: "/api/v1" });
   await fastify.register(timeSlotBlockRoutes, { prefix: "/api/v1" });
