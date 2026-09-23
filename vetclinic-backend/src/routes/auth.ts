@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { z } from "zod";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import { OAuth2Client } from "google-auth-library";
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -164,4 +165,73 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     return reply.send({ message: "Mot de passe changé avec succès." });
   });
+
+  fastify.post(
+    "/auth/google",
+    {
+      config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+      schema: {
+        body: {
+          type: "object",
+          required: ["idToken"],
+          properties: {
+            idToken: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const parsed = z.object({ idToken: z.string() }).safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
+      }
+
+      const { idToken } = parsed.data;
+      const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+      let googleUser;
+      try {
+        const ticket = await client.verifyIdToken({
+          idToken,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        googleUser = ticket.getPayload();
+      } catch (err) {
+        return reply.code(401).send({ error: "Token Google invalide." });
+      }
+
+      if (!googleUser?.email) {
+        return reply.code(400).send({ error: "Email non trouvé dans le token Google." });
+      }
+
+      const { email, given_name, family_name } = googleUser;
+
+      const existingUser = await fastify.prisma.user.findUnique({ where: { email } });
+
+      let user;
+      if (existingUser) {
+        if (existingUser.authProvider !== "GOOGLE") {
+          return reply.code(403).send({ error: "Cet email est déjà utilisé avec une connexion classique." });
+        }
+        user = existingUser;
+      } else {
+        const passwordHash = await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 12);
+        user = await fastify.prisma.user.create({
+          data: {
+            email,
+            passwordHash,
+            firstName: given_name || "Utilisateur",
+            lastName: family_name || "",
+            role: "CLIENT",
+            emailVerified: true,
+            authProvider: "GOOGLE",
+          },
+          select: { id: true, email: true, firstName: true, lastName: true, role: true },
+        });
+      }
+
+      const token = fastify.jwt.sign({ userId: user.id, role: user.role });
+      return reply.send({ user, token, authProvider: "GOOGLE" });
+    }
+  );
 }
