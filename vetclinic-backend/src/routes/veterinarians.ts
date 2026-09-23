@@ -101,4 +101,70 @@ export default async function veterinariansRoutes(fastify: FastifyInstance) {
 
     return reply.code(201).send(veterinarian);
   });
+
+  fastify.get(
+    "/veterinarians",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        querystestring: {
+          type: "object",
+          properties: {
+            availableOnly: { type: "boolean" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              data: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    firstName: { type: "string" },
+                    lastName: { type: "string" },
+                    specialty: { type: "string" },
+                    bio: { type: "string" },
+                    isAvailableForBooking: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { availableOnly } = request.query as { availableOnly?: boolean };
+      const where = {
+        ...(availableOnly ? { isAvailableForBooking: true } : {}),
+      };
+
+      const veterinarians = await fastify.prisma.veterinarian.findMany({
+        where,
+        select: {
+          id: true,
+          userId: true,
+          specialty: true,
+          bio: true,
+          isAvailableForBooking: true,
+          createdAt: true,
+          updatedAt: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+            },
+          },
+        },
+      });
+
+      return reply.send({ data: veterinarians });
+    }
+  );
 }

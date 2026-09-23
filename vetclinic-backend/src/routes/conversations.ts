@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getPaginationParams, paginatedResponse, searchFilter } from "../utils/pagination";
 
 const createConversationSchema = z.object({
-  veterinarianId: z.string().uuid().nullable().optional(),
+  veterinarianId: z.string().uuid(),
 });
 
 const createMessageSchema = z
@@ -147,8 +147,9 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
       schema: {
         body: {
           type: "object",
+          required: ["veterinarianId"],
           properties: {
-            veterinarianId: { type: "string", format: "uuid", nullable: true },
+            veterinarianId: { type: "string", format: "uuid" },
           },
         },
       },
