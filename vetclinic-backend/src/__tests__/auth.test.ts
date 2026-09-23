@@ -19,10 +19,26 @@ describe("Auth", () => {
   const testEmail = `test-auth-${Date.now()}@test.com`;
   const testPassword = "SecurePass123!";
 
+  // NOTE HISTORIQUE (cause racine du test "email déjà vérifié" qui persistait) :
+  // Le rate limiter (POST /auth/register et POST /auth/login : max 5 / minute)
+  // classe les requêtes par IP cliente. Ce fichier envoie 7 register + 6 login
+  // dans la même minute. Sans isolation, la 6e requête depuis la même IP est
+  // rejetée en 429 : l'utilisateur n'est jamais créé et tous les appels Prisma
+  // qui le cherchent renvoient "vide" (ce n'est PAS un bug Prisma).
+  // PREUVE : test jetable validé en session — 6 register successifs -> #6 -> 429.
+  // Correction : chaque requête utilise une IP client distincte, comme des
+  // clients réels. Le rate limiter reste actif et testé.
+  let ipIndex = 0;
+  function nextIp(): string {
+    ipIndex += 1;
+    return `127.0.0.${ipIndex}`;
+  }
+
   it("POST /api/v1/auth/register — inscription réussie", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/auth/register",
+      remoteAddress: nextIp(),
       payload: {
         email: testEmail,
         password: testPassword,
@@ -42,6 +58,7 @@ describe("Auth", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/auth/register",
+      remoteAddress: nextIp(),
       payload: {
         email: testEmail,
         password: testPassword,
@@ -59,6 +76,7 @@ describe("Auth", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/auth/login",
+      remoteAddress: nextIp(),
       payload: {
         email: testEmail,
         password: testPassword,
@@ -75,6 +93,7 @@ describe("Auth", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/auth/login",
+      remoteAddress: nextIp(),
       payload: {
         email: testEmail,
         password: "WrongPassword999!",
@@ -85,29 +104,31 @@ describe("Auth", () => {
   });
 
    it("POST /api/v1/auth/login — email inexistant (401)", async () => {
-     const res = await app.inject({
-       method: "POST",
-       url: "/api/v1/auth/login",
-       payload: {
-         email: "nonexistent@test.com",
-         password: "Whatever123!",
-       },
-     });
+const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/login",
+        remoteAddress: nextIp(),
+        payload: {
+          email: "nonexistent@test.com",
+          password: "Whatever123!",
+        },
+      });
 
      expect(res.statusCode).toBe(401);
    });
 
    it("POST /api/v1/auth/register — envoie un code OTP (emailVerified: false)", async () => {
-     const res = await app.inject({
-       method: "POST",
-       url: "/api/v1/auth/register",
-       payload: {
-         email: `otp-test-${Date.now()}@test.com`,
-         password: "SecurePass123!",
-         firstName: "OTP",
-         lastName: "Test",
-       },
-     });
+const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/register",
+        remoteAddress: nextIp(),
+        payload: {
+          email: `otp-test-${Date.now()}@test.com`,
+          password: "SecurePass123!",
+          firstName: "OTP",
+          lastName: "Test",
+        },
+      });
 
      expect(res.statusCode).toBe(201);
      const body = res.json();
@@ -116,17 +137,18 @@ describe("Auth", () => {
    });
 
    it("POST /api/v1/auth/verify-email — vérification réussie", async () => {
-     const regEmail = `verify-${Date.now()}@test.com`;
-     await app.inject({
-       method: "POST",
-       url: "/api/v1/auth/register",
-       payload: {
-         email: regEmail,
-         password: "SecurePass123!",
-         firstName: "Verify",
-         lastName: "Test",
-       },
-     });
+const regEmail = `verify-${Date.now()}@test.com`;
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/register",
+        remoteAddress: nextIp(),
+        payload: {
+          email: regEmail,
+          password: "SecurePass123!",
+          firstName: "Verify",
+          lastName: "Test",
+        },
+      });
 
 const user = await prisma.user.findUnique({ where: { email: regEmail } });
       const codeRecord = await prisma.emailVerificationCode.findFirst({
@@ -137,6 +159,7 @@ const user = await prisma.user.findUnique({ where: { email: regEmail } });
       const loginRes = await app.inject({
         method: "POST",
         url: "/api/v1/auth/login",
+        remoteAddress: nextIp(),
         payload: { email: regEmail, password: "SecurePass123!" },
       });
       const token = loginRes.json().token;
@@ -158,6 +181,7 @@ it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
       await app.inject({
         method: "POST",
         url: "/api/v1/auth/register",
+        remoteAddress: nextIp(),
         payload: {
           email: regEmail,
           password: "SecurePass123!",
@@ -169,6 +193,7 @@ it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
       const loginRes = await app.inject({
         method: "POST",
         url: "/api/v1/auth/login",
+        remoteAddress: nextIp(),
         payload: { email: regEmail, password: "SecurePass123!" },
       });
       const token = loginRes.json().token;
@@ -182,6 +207,57 @@ it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
 
       expect(verifyRes.statusCode).toBe(400);
       expect(verifyRes.json().error).toMatch(/invalide|expiré/i);
+    });
+
+    it("POST /api/v1/auth/verify-email — email déjà vérifié (400)", async () => {
+      const regEmail = `already-verified-${Date.now()}@test.com`;
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/register",
+        remoteAddress: nextIp(),
+        payload: {
+          email: regEmail,
+          password: "SecurePass123!",
+          firstName: "Already",
+          lastName: "Verified",
+        },
+      });
+
+      const user = await prisma.user.findUnique({ where: { email: regEmail } });
+      expect(user).not.toBeNull();
+      const codeRecord = await prisma.emailVerificationCode.findFirst({
+        where: { userId: user!.id },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(codeRecord).not.toBeNull();
+
+      const loginRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/login",
+        remoteAddress: nextIp(),
+        payload: { email: regEmail, password: "SecurePass123!" },
+      });
+      const token = loginRes.json().token;
+
+      const verifyFirst = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/verify-email",
+        remoteAddress: nextIp(),
+        headers: { authorization: `Bearer ${token}` },
+        payload: { email: regEmail, code: codeRecord!.code },
+      });
+      expect([200, 201]).toContain(verifyFirst.statusCode);
+
+      const verifyAgain = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/verify-email",
+        remoteAddress: nextIp(),
+        headers: { authorization: `Bearer ${token}` },
+        payload: { email: regEmail, code: codeRecord!.code },
+      });
+
+      expect(verifyAgain.statusCode).toBe(400);
+      expect(verifyAgain.json().error).toMatch(/déjà/i);
     });
 
 
@@ -206,6 +282,7 @@ it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
       await app.inject({
         method: "POST",
         url: "/api/v1/auth/register",
+        remoteAddress: nextIp(),
         payload: {
           email: existingEmail,
           password: "SecurePass123!",

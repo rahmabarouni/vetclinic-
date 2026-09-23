@@ -131,7 +131,7 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
     schema: {
       body: {
         type: "object",
-        required: ["petId", "veterinarianId", "appointmentType", "scheduledStart", "scheduledEnd"],
+        required: ["petId", "appointmentType", "scheduledStart", "scheduledEnd"],
         properties: {
           petId: { type: "string", format: "uuid" },
           veterinarianId: { type: "string", format: "uuid", nullable: true },

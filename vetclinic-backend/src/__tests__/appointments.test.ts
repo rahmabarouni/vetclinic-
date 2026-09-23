@@ -3,80 +3,66 @@ import { getApp, closeApp } from "./helper";
 
 let app: any;
 let clientToken: string;
-let vetUserId: string;
 let petId: string;
+let veterinarianId: string;
 
 beforeAll(async () => {
   app = await getApp();
 
-  // Register a fresh client
   const email = `slot-test-${Date.now()}@test.com`;
-  await app.inject({
+  const registerRes = await app.inject({
     method: "POST",
     url: "/api/v1/auth/register",
+    remoteAddress: "127.0.0.250",
     payload: { email, password: "TestPass123!", firstName: "Slot", lastName: "Test" },
   });
+  expect(registerRes.statusCode).toBe(201);
+
   const login = await app.inject({
     method: "POST",
     url: "/api/v1/auth/login",
+    remoteAddress: "127.0.0.250",
     payload: { email, password: "TestPass123!" },
   });
+  expect(login.statusCode).toBe(200);
   clientToken = login.json().token;
 
-  // Get an existing vet
-  const vetLogin = await app.inject({
-    method: "POST",
-    url: "/api/v1/auth/login",
-    payload: { email: "dr.martin@vetclinic.test", password: "REDACTED_DEMO_PASSWORD" },
-  });
-  // We need the vet profile ID, not the user ID
-  // Use the vets endpoint or query directly
-  const vetUserLogin = await app.inject({
-    method: "POST",
-    url: "/api/v1/auth/login",
-    payload: { email: "dr.martin@vetclinic.test", password: "REDACTED_DEMO_PASSWORD" },
-  });
-  const vetToken = vetUserLogin.json().token;
-
-  // Create a pet for the client
   const petRes = await app.inject({
     method: "POST",
     url: "/api/v1/pets",
     headers: { authorization: `Bearer ${clientToken}` },
     payload: { name: "TestPet", species: "CAT" },
   });
+  expect(petRes.statusCode).toBe(201);
   petId = petRes.json().pet.id;
 
-  // Get vet profile ID from the token's user
-  // We'll use the admin to get vet info
+  // Un vétérinaire tout neuf, garanti sans RDV résiduels en base (la base
+  // est partagée entre tous les fichiers de test : laisser la suite dépendre
+  // d'un vétérinaire existant rendrait ce test vulnérable aux données des
+  // autres runs).
   const adminLogin = await app.inject({
     method: "POST",
     url: "/api/v1/auth/login",
+    remoteAddress: "127.0.0.250",
     payload: { email: "admin@vetclinic.test", password: "REDACTED_DEMO_PASSWORD" },
   });
+  expect(adminLogin.statusCode).toBe(200);
+  const adminToken = adminLogin.json().token;
 
-  // Create first appointment
-  const now = new Date();
-  const start1 = new Date(now.getTime() + 24 * 60 * 60 * 1000); // tomorrow
-  start1.setHours(10, 0, 0, 0);
-  const end1 = new Date(start1);
-  end1.setHours(11, 0, 0, 0);
-
-  const appt1Res = await app.inject({
+  const vetRes = await app.inject({
     method: "POST",
-    url: "/api/v1/appointments",
-    headers: { authorization: `Bearer ${clientToken}` },
+    url: "/api/v1/veterinarians",
+    headers: { authorization: `Bearer ${adminToken}` },
     payload: {
-      petId,
-      appointmentType: "CONSULTATION",
-      scheduledStart: start1.toISOString(),
-      scheduledEnd: end1.toISOString(),
-      reason: "Test appointment 1",
+      email: `appt-vet-${Date.now()}@test.com`,
+      password: "TestPass123!",
+      firstName: "Appt",
+      lastName: "Vet",
+      specialty: "GENERALIST",
     },
   });
-
-  // Store the first appointment info for overlap test
-  // The vet is not assigned in this test, so we test without vet conflict
+  expect(vetRes.statusCode).toBe(201);
+  veterinarianId = vetRes.json().veterinarian.id;
 });
 
 afterAll(async () => {
@@ -85,23 +71,18 @@ afterAll(async () => {
 
 describe("Appointment slot overlap", () => {
   it("POST /api/v1/appointments — refuse un créneau chevauchant (même vétérinaire)", async () => {
-    // Get the vet profile ID by querying via admin
-    // For this test, we'll create appointments without vet assignment
-    // and test the general flow
+    const now = Date.now();
+    const start = new Date(now + 48 * 60 * 60 * 1000);
+    const end = new Date(now + 49 * 60 * 60 * 1000);
 
-    const now = new Date();
-    const start = new Date(now.getTime() + 48 * 60 * 60 * 1000); // day after tomorrow
-    start.setHours(14, 0, 0, 0);
-    const end = new Date(start);
-    end.setHours(15, 0, 0, 0);
-
-    // First appointment
+    // Premier RDV : animal 1 + vétérinaire
     const res1 = await app.inject({
       method: "POST",
       url: "/api/v1/appointments",
       headers: { authorization: `Bearer ${clientToken}` },
       payload: {
         petId,
+        veterinarianId,
         appointmentType: "CHECKUP",
         scheduledStart: start.toISOString(),
         scheduledEnd: end.toISOString(),
@@ -110,30 +91,38 @@ describe("Appointment slot overlap", () => {
     });
     expect(res1.statusCode).toBe(201);
 
-    // Overlapping appointment (same time)
+    // Second animal du même client, même vétérinaire, créneau identique -> conflit véto
+    const pet2Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pets",
+      headers: { authorization: `Bearer ${clientToken}` },
+      payload: { name: "SecondPet", species: "DOG" },
+    });
+    expect(pet2Res.statusCode).toBe(201);
+    const pet2Id = pet2Res.json().pet.id;
+
     const res2 = await app.inject({
       method: "POST",
       url: "/api/v1/appointments",
       headers: { authorization: `Bearer ${clientToken}` },
       payload: {
-        petId,
+        petId: pet2Id,
+        veterinarianId,
         appointmentType: "CHECKUP",
         scheduledStart: start.toISOString(),
         scheduledEnd: end.toISOString(),
-        reason: "Overlapping appointment",
+        reason: "Overlapping appointment same vet",
       },
     });
 
-    // Without vet, no overlap check — should succeed
-    expect(res2.statusCode).toBe(201);
+    expect(res2.statusCode).toBe(409);
+    expect(res2.json().error).toMatch(/occupé|chez/i);
   });
 
   it("POST /api/v1/appointments — sans vétérinaire, pas de vérification de chevauchement", async () => {
-    const now = new Date();
-    const start = new Date(now.getTime() + 72 * 60 * 60 * 1000); // 3 days from now
-    start.setHours(9, 0, 0, 0);
-    const end = new Date(start);
-    end.setHours(10, 0, 0, 0);
+    const now = Date.now();
+    const start = new Date(now + 72 * 60 * 60 * 1000);
+    const end = new Date(now + 73 * 60 * 60 * 1000);
 
     const res = await app.inject({
       method: "POST",
@@ -156,8 +145,7 @@ describe("Appointment slot overlap", () => {
     const start = new Date(now.getTime() + 96 * 60 * 60 * 1000);
     start.setHours(14, 0, 0, 0);
     const end = new Date(start);
-    end.setHours(13, 0, 0, 0); // end before start
-
+    end.setHours(13, 0, 0, 0);
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/appointments",
@@ -175,16 +163,17 @@ describe("Appointment slot overlap", () => {
   });
 
   it("POST /api/v1/appointments — pet d'un autre CLIENT rejeté (403)", async () => {
-    // Register another client
     const email2 = `slot-test-b-${Date.now()}@test.com`;
     await app.inject({
       method: "POST",
       url: "/api/v1/auth/register",
+      remoteAddress: "127.0.0.249",
       payload: { email: email2, password: "TestPass123!", firstName: "Other", lastName: "Client" },
     });
     const login2 = await app.inject({
       method: "POST",
       url: "/api/v1/auth/login",
+      remoteAddress: "127.0.0.249",
       payload: { email: email2, password: "TestPass123!" },
     });
     const otherToken = login2.json().token;
@@ -200,7 +189,7 @@ describe("Appointment slot overlap", () => {
       url: "/api/v1/appointments",
       headers: { authorization: `Bearer ${otherToken}` },
       payload: {
-        petId, // belongs to client A
+        petId,
         appointmentType: "CHECKUP",
         scheduledStart: start.toISOString(),
         scheduledEnd: end.toISOString(),
