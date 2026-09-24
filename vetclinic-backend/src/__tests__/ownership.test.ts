@@ -14,7 +14,7 @@ beforeAll(async () => {
   await app.inject({
     method: "POST",
     url: "/api/v1/auth/register",
-    payload: { email: emailA, password: "TestPass123!", firstName: "Owner", lastName: "A" },
+    payload: { email: emailA, password: "TestPass123!", firstName: "Owner", lastName: "A", privacyConsent: true },
   });
   const loginA = await app.inject({
     method: "POST",
@@ -28,7 +28,7 @@ beforeAll(async () => {
   await app.inject({
     method: "POST",
     url: "/api/v1/auth/register",
-    payload: { email: emailB, password: "TestPass123!", firstName: "Owner", lastName: "B" },
+    payload: { email: emailB, password: "TestPass123!", firstName: "Owner", lastName: "B", privacyConsent: true },
   });
   const loginB = await app.inject({
     method: "POST",

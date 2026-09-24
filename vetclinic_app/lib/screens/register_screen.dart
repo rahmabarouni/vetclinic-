@@ -19,6 +19,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _privacyConsent = false;
+
+  void _showConsentInfo() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Consentement RGPD'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Vos données personnelles (nom, email, informations sur vos animaux, '
+            'rendez-vous et messages) sont utilisées exclusivement pour le '
+            'fonctionnement de PawCare : gestion des rendez-vous, suivi médical '
+            'et notifications. Elles ne sont pas revendues et ne sont jamais '
+            'partagées avec des tiers sans votre accord. Vous pouvez demander '
+            'leur accès, leur rectification ou leur suppression à tout moment.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Compris'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -39,6 +65,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           password: _passwordController.text,
           firstName: _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim(),
+          privacyConsent: _privacyConsent,
         );
 
     if (!mounted) return;
@@ -174,6 +201,46 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
+                FormField<bool>(
+                  validator: (_) => _privacyConsent
+                      ? null
+                      : 'Vous devez accepter le consentement RGPD pour continuer',
+                  builder: (field) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: AppColors.primary,
+                        value: _privacyConsent,
+                        onChanged: (v) {
+                          setState(() => _privacyConsent = v ?? false);
+                          field.didChange(v ?? false);
+                        },
+                        title: const Text(
+                          "Je consens au traitement de mes données personnelles",
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _showConsentInfo,
+                        child: const Text(
+                          'Lire le consentement RGPD',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      if (field.hasError)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 12),
+                          child: Text(
+                            field.errorText!,
+                            style: const TextStyle(color: AppColors.error, fontSize: 12),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
@@ -198,7 +265,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         : const Text("S'inscrire"),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Déjà un compte ? Se connecter'),

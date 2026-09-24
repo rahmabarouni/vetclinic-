@@ -21,6 +21,7 @@ import notificationsRoutes from "./routes/notifications";
 import veterinariansRoutes from "./routes/veterinarians";
 import wsConversationsRoutes from "./routes/ws-conversations";
 import uploadsRoutes from "./routes/uploads";
+import fcmRoutes from "./routes/fcm";
 import dashboardRoutes from "./routes/dashboard";
 import passwordResetRoutes from "./routes/password-reset";
 import downloadsRoutes from "./routes/downloads";
@@ -71,6 +72,7 @@ export async function buildApp() {
   await fastify.register(veterinariansRoutes, { prefix: "/api/v1" });
   await fastify.register(wsConversationsRoutes, { prefix: "/api/v1" });
   await fastify.register(uploadsRoutes, { prefix: "/api/v1" });
+  await fastify.register(fcmRoutes, { prefix: "/api/v1" });
   await fastify.register(dashboardRoutes, { prefix: "/api/v1" });
   await fastify.register(passwordResetRoutes, { prefix: "/api/v1" });
   await fastify.register(downloadsRoutes, { prefix: "/api/v1" });

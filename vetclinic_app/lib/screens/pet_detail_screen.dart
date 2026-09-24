@@ -155,10 +155,24 @@ class _PetBanner extends StatelessWidget {
       ),
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 40,
-            backgroundColor: Colors.white24,
-            child: Icon(_speciesIcon, color: Colors.white, size: 40),
+          ClipOval(
+            child: pet.photoUrl != null && pet.photoUrl!.isNotEmpty
+                ? Image.network(
+                    pet.photoUrl!,
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.white24,
+                      child: Icon(_speciesIcon, color: Colors.white, size: 40),
+                    ),
+                  )
+                : CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Colors.white24,
+                    child: Icon(_speciesIcon, color: Colors.white, size: 40),
+                  ),
           ),
           const SizedBox(height: 12),
           Wrap(

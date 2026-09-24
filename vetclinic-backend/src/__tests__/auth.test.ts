@@ -44,6 +44,7 @@ describe("Auth", () => {
         password: testPassword,
         firstName: "Test",
         lastName: "User",
+        privacyConsent: true,
       },
     });
 
@@ -52,6 +53,39 @@ describe("Auth", () => {
     expect(body).toHaveProperty("token");
     expect(body.user.email).toBe(testEmail);
     expect(body.user.role).toBe("CLIENT");
+  });
+
+  it("POST /api/v1/auth/register — consentement RGPD manquant (400)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/register",
+      remoteAddress: nextIp(),
+      payload: {
+        email: `no-consent-${Date.now()}@test.com`,
+        password: "SecurePass123!",
+        firstName: "No",
+        lastName: "Consent",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("POST /api/v1/auth/register — consentement explicite refusé (400)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/register",
+      remoteAddress: nextIp(),
+      payload: {
+        email: `consent-false-${Date.now()}@test.com`,
+        password: "SecurePass123!",
+        firstName: "False",
+        lastName: "Consent",
+        privacyConsent: false,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
   });
 
   it("POST /api/v1/auth/register — email déjà utilisé (409)", async () => {
@@ -64,6 +98,7 @@ describe("Auth", () => {
         password: testPassword,
         firstName: "Test",
         lastName: "User",
+        privacyConsent: true,
       },
     });
 
@@ -127,6 +162,7 @@ const res = await app.inject({
           password: "SecurePass123!",
           firstName: "OTP",
           lastName: "Test",
+        privacyConsent: true,
         },
       });
 
@@ -147,6 +183,7 @@ const regEmail = `verify-${Date.now()}@test.com`;
           password: "SecurePass123!",
           firstName: "Verify",
           lastName: "Test",
+        privacyConsent: true,
         },
       });
 
@@ -187,6 +224,7 @@ it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
           password: "SecurePass123!",
           firstName: "Bad",
           lastName: "Code",
+        privacyConsent: true,
         },
       });
 
@@ -220,6 +258,7 @@ it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
           password: "SecurePass123!",
           firstName: "Already",
           lastName: "Verified",
+        privacyConsent: true,
         },
       });
 
@@ -288,6 +327,7 @@ it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
           password: "SecurePass123!",
           firstName: "Existing",
           lastName: "User",
+        privacyConsent: true,
         },
       });
 

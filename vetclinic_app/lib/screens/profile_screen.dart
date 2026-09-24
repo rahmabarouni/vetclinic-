@@ -24,6 +24,64 @@ class ProfileScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _editInfo(BuildContext context, WidgetRef ref) async {
+    final user = ref.read(authProvider).user;
+    final phoneController = TextEditingController(text: user?.phone ?? '');
+    final addressController = TextEditingController(text: user?.address ?? '');
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mes informations'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Téléphone',
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: addressController,
+              keyboardType: TextInputType.streetAddress,
+              decoration: const InputDecoration(
+                labelText: 'Adresse',
+                prefixIcon: Icon(Icons.home_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true && context.mounted) {
+      await ref.read(authProvider.notifier).updateProfile(
+            phone: phoneController.text.trim().isEmpty
+                ? null
+                : phoneController.text.trim(),
+            address: addressController.text.trim().isEmpty
+                ? null
+                : addressController.text.trim(),
+            firstName: user?.firstName,
+            lastName: user?.lastName,
+          );
+    }
+  }
+
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -108,20 +166,39 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const Card(
+          Card(
             child: Column(
               children: [
-                ListTile(
+                const ListTile(
                   leading: Icon(Icons.notifications_outlined, color: AppColors.primary),
                   title: Text('Notifications push'),
                   subtitle: Text('Rappels de rendez-vous et messages'),
-                  trailing: Chip(label: Text('À venir')),
                 ),
-                Divider(height: 1),
+                const Divider(height: 1),
                 ListTile(
-                  leading: Icon(Icons.medical_services_outlined, color: AppColors.primary),
-                  title: Text('Mes informations'),
-                  subtitle: Text('À venir dans cette version'),
+                  leading: const Icon(Icons.phone_outlined, color: AppColors.primary),
+                  title: const Text('Téléphone'),
+                  subtitle: Text(
+                    user?.phone != null && user!.phone!.isNotEmpty
+                        ? user.phone!
+                        : 'Non renseigné',
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.home_outlined, color: AppColors.primary),
+                  title: const Text('Adresse'),
+                  subtitle: Text(
+                    user?.address != null && user!.address!.isNotEmpty
+                        ? user.address!
+                        : 'Non renseignée',
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                  title: const Text('Modifier mes informations'),
+                  onTap: () => _editInfo(context, ref),
                 ),
               ],
             ),

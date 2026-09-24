@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { WebSocket } from "ws";
+import { notifyUser } from "../services/notify";
 
 const wsMessageSchema = z
   .object({
@@ -215,13 +216,11 @@ export default async function wsConversationsRoutes(fastify: FastifyInstance) {
                 : { userId: recipientId };
 
             if (recipientUser?.userId) {
-              await fastify.prisma.notification.create({
-                data: {
-                  recipientId: recipientUser.userId,
-                  type: "MESSAGE",
-                  title: `Nouveau message de ${sender?.firstName} ${sender?.lastName}`,
-                  message: validation.data.content?.substring(0, 200) || "Pièce jointe",
-                },
+              await notifyUser(fastify, {
+                recipientId: recipientUser.userId,
+                type: "MESSAGE",
+                title: `Nouveau message de ${sender?.firstName} ${sender?.lastName}`,
+                body: validation.data.content?.substring(0, 200) || "Pièce jointe",
               });
             }
           }

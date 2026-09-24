@@ -13,7 +13,7 @@ beforeAll(async () => {
   await app.inject({
     method: "POST",
     url: "/api/v1/auth/register",
-    payload: { email, password: "TestPass123!", firstName: "RBAC", lastName: "Client" },
+    payload: { email, password: "TestPass123!", firstName: "RBAC", lastName: "Client", privacyConsent: true },
   });
   const clientLogin = await app.inject({
     method: "POST",
@@ -66,7 +66,7 @@ describe("RBAC", () => {
         email: `vet-test-${Date.now()}@test.com`,
         password: "VetPass123!",
         firstName: "Vet",
-        lastName: "Test",
+        lastName: "Test", privacyConsent: true,
         specialty: "Test",
       },
     });
@@ -82,7 +82,7 @@ describe("RBAC", () => {
         email: `vet-test-${Date.now()}@test.com`,
         password: "VetPass123!",
         firstName: "Vet",
-        lastName: "Test",
+        lastName: "Test", privacyConsent: true,
         specialty: "Test",
       },
     });

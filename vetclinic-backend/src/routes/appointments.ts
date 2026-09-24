@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import { AppointmentStatus, AppointmentType } from "@prisma/client";
 import { z } from "zod";
 import { getPaginationParams, paginatedResponse, searchFilter } from "../utils/pagination";
+import { notifyUser } from "../services/notify";
 
 const appointmentTypeValues = ["CONSULTATION", "VACCINATION", "SURGERY", "EMERGENCY", "CHECKUP", "GROOMING", "OTHER"] as const;
 const appointmentStatusValues = ["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED", "NO_SHOW"] as const;
@@ -216,6 +217,19 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
       select: appointmentSelect,
     });
 
+    if (appointment.veterinarian?.userId) {
+      try {
+        await notifyUser(fastify, {
+          recipientId: appointment.veterinarian.userId,
+          type: "APPOINTMENT",
+          title: "Nouvelle demande de rendez-vous",
+          body: `${appointment.pet?.name ?? "Un animal"} — ${appointment.appointmentType}`,
+        });
+      } catch (err) {
+        fastify.log.error("Notification RDV échouée: %s", String(err));
+      }
+    }
+
     return reply.code(201).send({ appointment });
   });
 
@@ -315,6 +329,17 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
         data: { status: parsedBody.data.status },
         select: appointmentSelect,
       });
+
+      try {
+        await notifyUser(fastify, {
+          recipientId: updatedAppointment.clientId,
+          type: "APPOINTMENT",
+          title: "Statut du rendez-vous mis à jour",
+          body: `${updatedAppointment.pet?.name ?? "RDV"} — ${parsedBody.data.status}`,
+        });
+      } catch (err) {
+        fastify.log.error("Notification statut RDV échouée: %s", String(err));
+      }
 
       return reply.send({ appointment: updatedAppointment });
     }

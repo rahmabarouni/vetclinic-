@@ -45,12 +45,14 @@ class ApiService {
     required String password,
     required String firstName,
     required String lastName,
+    required bool privacyConsent,
   }) async {
     final response = await _dio.post('/api/v1/auth/register', data: {
       'email': email,
       'password': password,
       'firstName': firstName,
       'lastName': lastName,
+      'privacyConsent': privacyConsent,
     });
     final data = response.data as Map<String, dynamic>;
     await setToken(data['token'] as String);
@@ -88,6 +90,46 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getProfile() async {
+    final response = await _dio.get('/api/v1/users/profile');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateProfile({
+    String? firstName,
+    String? lastName,
+    String? phone,
+    String? address,
+  }) async {
+    final response = await _dio.put('/api/v1/users/profile', data: {
+      'firstName': ?firstName,
+      'lastName': ?lastName,
+      'phone': ?phone,
+      'address': ?address,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<String> uploadFile({
+    required String path,
+    required String filename,
+  }) async {
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(path, filename: filename),
+    });
+    final response = await _dio.post('/api/v1/uploads', data: form);
+    final upload = (response.data as Map<String, dynamic>)['upload'] as Map<String, dynamic>;
+    return upload['url'] as String;
+  }
+
+  Future<void> registerFcmToken(String token) async {
+    await _dio.put('/api/v1/fcm-token', data: {'token': token});
+  }
+
+  Future<void> unregisterFcmToken() async {
+    await _dio.delete('/api/v1/fcm-token');
+  }
+
   Future<Map<String, dynamic>> getPets({int page = 1, int limit = 20, String? search}) async {
     final queryParams = <String, dynamic>{'page': page, 'limit': limit};
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
@@ -101,6 +143,7 @@ class ApiService {
     String? breed,
     String? sex,
     double? weightKg,
+    String? photoUrl,
   }) async {
     final response = await _dio.post('/api/v1/pets', data: {
       'name': name,
@@ -108,6 +151,7 @@ class ApiService {
       'breed': ?breed,
       'sex': ?sex,
       'weightKg': ?weightKg,
+      'photoUrl': ?photoUrl,
     });
     return response.data as Map<String, dynamic>;
   }
@@ -118,6 +162,7 @@ class ApiService {
     String? breed,
     String? sex,
     double? weightKg,
+    String? photoUrl,
   }) async {
     final response = await _dio.patch('/api/v1/pets/$id', data: {
       'name': ?name,
@@ -125,6 +170,7 @@ class ApiService {
       'breed': ?breed,
       'sex': ?sex,
       'weightKg': ?weightKg,
+      'photoUrl': ?photoUrl,
     });
     return response.data as Map<String, dynamic>;
   }

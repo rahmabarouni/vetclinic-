@@ -9,6 +9,7 @@ const createPetSchema = z.object({
   breed: z.string().optional(),
   sex: z.enum(["MALE", "FEMALE", "UNKNOWN"]).optional(),
   weightKg: z.number().positive().optional(),
+  photoUrl: z.string().url().optional(),
 });
 
 const updatePetSchema = z.object({
@@ -17,6 +18,7 @@ const updatePetSchema = z.object({
   breed: z.string().optional(),
   sex: z.enum(["MALE", "FEMALE", "UNKNOWN"]).optional(),
   weightKg: z.number().positive().optional(),
+  photoUrl: z.string().url().optional(),
 });
 
 export default async function petsRoutes(fastify: FastifyInstance) {
@@ -52,6 +54,7 @@ export default async function petsRoutes(fastify: FastifyInstance) {
           breed: { type: "string", examples: ["Berger Allemand"] },
           sex: { type: "string", enum: ["MALE", "FEMALE", "UNKNOWN"] },
           weightKg: { type: "number", examples: [25] },
+          photoUrl: { type: "string", examples: ["http://minio/.../reximg.jpg"] },
         },
       },
     },
@@ -77,6 +80,7 @@ export default async function petsRoutes(fastify: FastifyInstance) {
           name: { type: "string", minLength: 1 },
           species: { type: "string", enum: ["DOG", "CAT", "BIRD", "RABBIT", "RODENT", "REPTILE", "OTHER"] },
           breed: { type: "string" },
+          photoUrl: { type: "string" },
           sex: { type: "string", enum: ["MALE", "FEMALE", "UNKNOWN"] },
           weightKg: { type: "number", minimum: 0 },
         },

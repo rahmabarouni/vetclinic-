@@ -10,6 +10,9 @@ const registerSchema = z.object({
   password: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
+  privacyConsent: z.literal(true, {
+    errorMap: () => ({ message: "Le consentement explicite est requis." }),
+  }),
 });
 
 const loginSchema = z.object({
@@ -28,12 +31,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
     schema: {
       body: {
         type: "object",
-        required: ["email", "password", "firstName", "lastName"],
+        required: ["email", "password", "firstName", "lastName", "privacyConsent"],
         properties: {
           email: { type: "string", format: "email" },
           password: { type: "string", minLength: 8 },
           firstName: { type: "string", minLength: 1 },
           lastName: { type: "string", minLength: 1 },
+          privacyConsent: { type: "boolean", const: true },
         },
       },
     },
@@ -51,7 +55,14 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await fastify.prisma.user.create({
-      data: { email, passwordHash, firstName, lastName, role: "CLIENT" },
+      data: {
+        email,
+        passwordHash,
+        firstName,
+        lastName,
+        role: "CLIENT",
+        privacyConsentAt: new Date(),
+      },
       select: { id: true, email: true, firstName: true, lastName: true, role: true },
     });
 
@@ -225,6 +236,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             role: "CLIENT",
             emailVerified: true,
             authProvider: "GOOGLE",
+            privacyConsentAt: new Date(),
           },
           select: { id: true, email: true, firstName: true, lastName: true, role: true },
         });

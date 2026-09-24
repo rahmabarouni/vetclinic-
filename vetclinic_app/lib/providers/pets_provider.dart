@@ -68,10 +68,11 @@ class PetsNotifier extends StateNotifier<PetsState> {
     String? breed,
     String? sex,
     double? weightKg,
+    String? photoUrl,
   }) async {
     state = state.copyWith(status: PetsStatus.loading);
     try {
-      await _api.createPet(name: name, species: species, breed: breed, sex: sex, weightKg: weightKg);
+      await _api.createPet(name: name, species: species, breed: breed, sex: sex, weightKg: weightKg, photoUrl: photoUrl);
       await loadPets(page: state.page);
       return true;
     } catch (e) {

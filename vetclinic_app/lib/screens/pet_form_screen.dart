@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import '../providers/auth_provider.dart';
 import '../providers/pets_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -18,6 +22,27 @@ class _PetFormScreenState extends ConsumerState<PetFormScreen> {
   String _species = 'DOG';
   String _sex = 'UNKNOWN';
   bool _submitting = false;
+  XFile? _photo;
+
+  Future<void> _pickPhoto() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 85,
+    );
+    if (picked != null && mounted) {
+      setState(() => _photo = picked);
+    }
+  }
+
+  Future<String?> _uploadPhoto() async {
+    final photo = _photo;
+    if (photo == null) return null;
+    final api = ref.read(apiServiceProvider);
+    return api.uploadFile(path: photo.path, filename: photo.name);
+  }
 
   @override
   void dispose() {
@@ -31,12 +56,29 @@ class _PetFormScreenState extends ConsumerState<PetFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
 
+    String? photoUrl;
+    if (_photo != null) {
+      try {
+        photoUrl = await _uploadPhoto();
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Impossible d'enregistrer la photo"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+
     final success = await ref.read(petsProvider.notifier).createPet(
       name: _nameController.text.trim(),
       species: _species,
       breed: _breedController.text.trim().isEmpty ? null : _breedController.text.trim(),
       sex: _sex,
       weightKg: double.tryParse(_weightController.text),
+      photoUrl: photoUrl,
     );
 
     setState(() => _submitting = false);
@@ -130,6 +172,41 @@ class _PetFormScreenState extends ConsumerState<PetFormScreen> {
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _photo != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            File(_photo!.path),
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.pets,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickPhoto,
+                      icon: const Icon(Icons.add_a_photo_outlined),
+                      label: Text(_photo != null ? 'Changer la photo' : 'Ajouter une photo'),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               SizedBox(

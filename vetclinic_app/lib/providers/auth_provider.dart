@@ -73,6 +73,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String password,
     required String firstName,
     required String lastName,
+    bool privacyConsent = true,
   }) async {
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
@@ -81,6 +82,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         password: password,
         firstName: firstName,
         lastName: lastName,
+        privacyConsent: privacyConsent,
       );
       final user = User.fromJson(data['user'] as Map<String, dynamic>);
       state = state.copyWith(status: AuthStatus.authenticated, user: user);
@@ -89,7 +91,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (e.toString().contains('409')) {
         message = 'Email déjà utilisé';
       } else if (e.toString().contains('400')) {
-        message = 'Données invalides';
+        message = 'Vous devez accepter les conditions et le consentement RGPD';
       }
       state = state.copyWith(status: AuthStatus.error, error: message);
     }
@@ -120,6 +122,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _api.logout();
     state = AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  Future<void> updateProfile({
+    String? firstName,
+    String? lastName,
+    String? phone,
+    String? address,
+  }) async {
+    try {
+      final data = await _api.updateProfile(
+        firstName: firstName,
+        lastName: lastName,
+        phone: phone,
+        address: address,
+      );
+      final user = User.fromJson(data['user'] as Map<String, dynamic>);
+      state = state.copyWith(user: user, error: null);
+    } catch (e) {
+      state = state.copyWith(error: 'Mise à jour du profil impossible');
+    }
+  }
+
+  Future<void> onNewFcmToken(String? token) async {
+    if (token == null || token.isEmpty) return;
+    try {
+      await _api.registerFcmToken(token);
+    } catch (_) {}
   }
 
   Future<String?> verifyEmail({

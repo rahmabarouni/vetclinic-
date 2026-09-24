@@ -14,7 +14,7 @@ beforeAll(async () => {
     method: "POST",
     url: "/api/v1/auth/register",
     remoteAddress: "127.0.0.250",
-    payload: { email, password: "TestPass123!", firstName: "Slot", lastName: "Test" },
+    payload: { email, password: "TestPass123!", firstName: "Slot", lastName: "Test", privacyConsent: true },
   });
   expect(registerRes.statusCode).toBe(201);
 
@@ -57,7 +57,7 @@ beforeAll(async () => {
       email: `appt-vet-${Date.now()}@test.com`,
       password: "TestPass123!",
       firstName: "Appt",
-      lastName: "Vet",
+      lastName: "Vet", privacyConsent: true,
       specialty: "GENERALIST",
     },
   });
@@ -168,7 +168,7 @@ describe("Appointment slot overlap", () => {
       method: "POST",
       url: "/api/v1/auth/register",
       remoteAddress: "127.0.0.249",
-      payload: { email: email2, password: "TestPass123!", firstName: "Other", lastName: "Client" },
+      payload: { email: email2, password: "TestPass123!", firstName: "Other", lastName: "Client", privacyConsent: true },
     });
     const login2 = await app.inject({
       method: "POST",

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_scaffold.dart';
+import 'services/push_service.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -15,6 +16,14 @@ class VetClinicApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
+
+    ref.listen<AuthState>(authProvider, (_, next) {
+      if (next.status == AuthStatus.authenticated) {
+        PushService.init((token) {
+          ref.read(authProvider.notifier).onNewFcmToken(token);
+        });
+      }
+    });
 
     return MaterialApp(
       title: 'PawCare',
