@@ -68,6 +68,7 @@ class AppointmentsNotifier extends StateNotifier<AppointmentsState> {
     required DateTime scheduledStart,
     required DateTime scheduledEnd,
     String? reason,
+    String? veterinarianId,
   }) async {
     state = state.copyWith(status: AppointmentsStatus.loading);
     try {
@@ -77,6 +78,7 @@ class AppointmentsNotifier extends StateNotifier<AppointmentsState> {
         scheduledStart: scheduledStart,
         scheduledEnd: scheduledEnd,
         reason: reason,
+        veterinarianId: veterinarianId,
       );
       await loadAppointments(page: state.page);
       return true;

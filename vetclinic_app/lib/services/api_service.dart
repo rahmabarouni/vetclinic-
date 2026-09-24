@@ -176,6 +176,16 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getMedicalRecords(String petId) async {
+    final response = await _dio.get('/api/v1/pets/$petId/medical-records');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getPetDocuments(String petId) async {
+    final response = await _dio.get('/api/v1/pets/$petId/documents');
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> createConversation({String? veterinarianId}) async {
     final response = await _dio.post('/api/v1/conversations', data: {
       'veterinarianId': ?veterinarianId,
