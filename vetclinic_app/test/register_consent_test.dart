@@ -49,7 +49,7 @@ Widget _build(_FakeApiService fake) {
 }
 
 void main() {
-  Future<void> _fillForm(WidgetTester tester) async {
+  Future<void> fillForm(WidgetTester tester) async {
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Jean');
     await tester.enterText(fields.at(1), 'Dupont');
@@ -58,7 +58,7 @@ void main() {
     await tester.enterText(fields.at(4), 'Motdepasse1!');
   }
 
-  Future<void> _tapSubmit(WidgetTester tester) async {
+  Future<void> tapSubmit(WidgetTester tester) async {
     await tester.ensureVisible(find.text("S'inscrire"));
     await tester.pumpAndSettle();
     await tester.tap(find.text("S'inscrire"));
@@ -69,8 +69,8 @@ void main() {
     final fake = _FakeApiService();
     await tester.pumpWidget(_build(fake));
 
-    await _fillForm(tester);
-    await _tapSubmit(tester);
+    await fillForm(tester);
+    await tapSubmit(tester);
 
     expect(fake.registerCalls, 0);
     expect(
@@ -83,14 +83,14 @@ void main() {
     final fake = _FakeApiService();
     await tester.pumpWidget(_build(fake));
 
-    await _fillForm(tester);
+    await fillForm(tester);
 
     await tester.ensureVisible(find.text('Je consens au traitement de mes données personnelles'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Je consens au traitement de mes données personnelles'));
     await tester.pump();
 
-    await _tapSubmit(tester);
+    await tapSubmit(tester);
 
     expect(fake.registerCalls, 1);
     expect(fake.lastPrivacyConsent, true);

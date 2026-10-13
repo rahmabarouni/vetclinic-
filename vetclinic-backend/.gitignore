@@ -9,6 +9,9 @@ dist/
 .env
 .env.local
 
+# Secrets / Firebase service accounts
+*firebase-adminsdk*.json
+
 # Logs
 *.log
 
