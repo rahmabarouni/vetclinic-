@@ -34,6 +34,45 @@ export interface PaginatedResponse<T> {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
+export interface MedicalRecord {
+  id: string;
+  petId: string;
+  appointmentId: string | null;
+  veterinarianId: string;
+  recordType: string;
+  title: string;
+  description: string | null;
+  diagnosis: string | null;
+  createdAt: string;
+  updatedAt: string;
+  veterinarian: {
+    id: string;
+    userId: string;
+    specialty: string | null;
+    user: { id: string; email: string; firstName: string; lastName: string; role: string };
+  } | null;
+}
+
+export interface Reminder {
+  id: string;
+  petId: string;
+  medicalRecordId: string | null;
+  reminderType: string;
+  title: string;
+  dueDate: string;
+  notifiedAt: string | null;
+  isCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VeterinarianListItem {
+  id: string;
+  userId: string;
+  specialty: string | null;
+  user: { id: string; email: string; firstName: string; lastName: string; role: string };
+}
+
 export async function backendLogin(email: string, password: string): Promise<{ token: string; user: User }> {
   const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
     method: 'POST',

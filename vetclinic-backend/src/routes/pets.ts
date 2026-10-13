@@ -231,6 +231,23 @@ export default async function petsRoutes(fastify: FastifyInstance) {
       },
     });
 
+    const reminders = await fastify.prisma.reminder.findMany({
+      where: { petId: pet.id },
+      orderBy: { dueDate: "asc" },
+      select: {
+        id: true,
+        petId: true,
+        medicalRecordId: true,
+        reminderType: true,
+        title: true,
+        dueDate: true,
+        notifiedAt: true,
+        isCompleted: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
     await logAudit(fastify.prisma, {
       userId: userId,
       action: "VIEW_MEDICAL_RECORD",
@@ -238,6 +255,6 @@ export default async function petsRoutes(fastify: FastifyInstance) {
       targetId: parsedParams.data.id,
     });
 
-    return reply.send({ medicalRecords });
+    return reply.send({ medicalRecords, reminders });
   });
 }

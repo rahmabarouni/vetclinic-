@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Appointment, PaginatedResponse } from '@/lib/api';
 
 const STATUS_OPTIONS = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const;
@@ -132,7 +133,9 @@ export default function DashboardPage() {
           <div className="text-center py-12 text-gray-400">Aucun rendez-vous</div>
         ) : (
           <div className="space-y-3">
-            {appointments.map((apt) => (
+            {appointments.map((apt) => {
+              const recordBase = `/dashboard/pets/${apt.petId}/medical-records?appointmentId=${apt.id}&petName=${encodeURIComponent(apt.pet.name)}${apt.veterinarianId ? `&veterinarianId=${apt.veterinarianId}` : ''}${apt.veterinarian ? `&vetName=${encodeURIComponent(`Dr ${apt.veterinarian.user.firstName} ${apt.veterinarian.user.lastName}`)}` : ''}`;
+              return (
               <div key={apt.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -156,6 +159,20 @@ export default function DashboardPage() {
                     {apt.reason && (
                       <div className="text-sm text-gray-400 mt-1">Motif: {apt.reason}</div>
                     )}
+                    <div className="flex flex-wrap gap-3 mt-2">
+                      <Link
+                        href={recordBase}
+                        className="text-sm text-green-600 hover:underline"
+                      >
+                        Voir le dossier médical
+                      </Link>
+                      <Link
+                        href={`${recordBase}&new=1`}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        Ajouter une note de consultation
+                      </Link>
+                    </div>
                   </div>
 
                   <div className="flex-shrink-0">
@@ -172,7 +189,8 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
