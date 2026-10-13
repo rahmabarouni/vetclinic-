@@ -178,7 +178,7 @@ export default function MedicalRecordsPage({
       <header className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
-            <Link href="/dashboard" className="text-sm text-green-600 hover:underline">
+            <Link href="/dashboard/appointments" className="text-sm text-green-600 hover:underline">
               &larr; Retour aux rendez-vous
             </Link>
             <h1 className="text-xl font-bold text-gray-900 mt-1">

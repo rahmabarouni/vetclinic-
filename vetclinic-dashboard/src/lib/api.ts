@@ -73,6 +73,14 @@ export interface VeterinarianListItem {
   user: { id: string; email: string; firstName: string; lastName: string; role: string };
 }
 
+export interface DashboardStats {
+  appointmentsToday: { byStatus: Record<string, number>; total: number };
+  newClientsLast30Days: number;
+  cancellationRate: { total: number; cancelled: number; rate: string };
+  appointmentTypesLast30Days: Record<string, number>;
+  unreadMessages: number;
+}
+
 export async function backendLogin(email: string, password: string): Promise<{ token: string; user: User }> {
   const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
     method: 'POST',
