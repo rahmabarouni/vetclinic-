@@ -123,11 +123,20 @@ fastify.post("/veterinarians", {
                   type: "object",
                   properties: {
                     id: { type: "string" },
-                    firstName: { type: "string" },
-                    lastName: { type: "string" },
+                    userId: { type: "string" },
                     specialty: { type: "string" },
                     bio: { type: "string" },
                     isAvailableForBooking: { type: "boolean" },
+                    user: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        email: { type: "string" },
+                        firstName: { type: "string" },
+                        lastName: { type: "string" },
+                        role: { type: "string" },
+                      },
+                    },
                   },
                 },
               },
