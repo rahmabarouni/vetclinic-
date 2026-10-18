@@ -1,22 +1,20 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getApp, closeApp } from "./helper";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { getApp, closeApp, prisma, deleteTestEntities } from "./helper";
 
 let app: any;
+const email = `fcm-${Date.now()}@test.com`;
+const createdEmails: string[] = [email];
 
 beforeAll(async () => {
   app = await getApp();
 });
 
 afterAll(async () => {
+  await deleteTestEntities({ userEmails: createdEmails });
   await closeApp();
-  await prisma.$disconnect();
 });
 
 describe("FCM tokens", () => {
-  const email = `fcm-${Date.now()}@test.com`;
   let token: string;
 
   it("POST /api/v1/fcm-token — enregistre le token (authentifié)", async () => {

@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getApp, closeApp } from "./helper";
-import { PrismaClient, UserRole } from "@prisma/client";
+import { getApp, closeApp, prisma, deleteTestEntities } from "./helper";
+import { UserRole } from "@prisma/client";
 import bcrypt from "bcrypt";
-
-const prisma = new PrismaClient();
 
 let app: any;
 let clientToken: string;
 let adminToken: string;
 let veterinarianId: string;
+const createdEmails: string[] = [];
+const createdConversationIds: string[] = [];
 
 beforeAll(async () => {
   app = await getApp();
@@ -26,6 +26,7 @@ beforeAll(async () => {
       role: UserRole.ADMIN,
     },
   });
+  createdEmails.push(admin.email);
   const adminLogin = await app.inject({
     method: "POST",
     url: "/api/v1/auth/login",
@@ -44,6 +45,7 @@ beforeAll(async () => {
       role: UserRole.VETERINARIAN,
     },
   });
+  createdEmails.push(vetUser.email);
   await prisma.veterinarian.upsert({
     where: { userId: vetUser.id },
     update: {},
@@ -74,6 +76,7 @@ beforeAll(async () => {
       role: UserRole.CLIENT,
     },
   });
+  createdEmails.push(client.email);
   const clientLogin = await app.inject({
     method: "POST",
     url: "/api/v1/auth/login",
@@ -83,8 +86,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await deleteTestEntities({
+    userEmails: createdEmails,
+    veterinarianIds: veterinarianId ? [veterinarianId] : [],
+    conversationIds: createdConversationIds,
+  });
   await closeApp();
-  await prisma.$disconnect();
 });
 
 describe("GET /api/v1/veterinarians", () => {
@@ -144,6 +151,7 @@ describe("POST /api/v1/conversations", () => {
     expect([200, 201]).toContain(res.statusCode);
     const body = res.json();
     expect(body).toHaveProperty("conversation");
+    createdConversationIds.push(body.conversation.id);
   });
 
   it("Doit refuser si veterinarianId est absent (400)", async () => {

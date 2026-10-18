@@ -1,15 +1,20 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getApp, closeApp } from "./helper";
+import { getApp, closeApp, deleteTestEntities } from "./helper";
 
 let app: any;
 let clientToken: string;
 let petId: string;
 let veterinarianId: string;
+const createdEmails: string[] = [];
+const createdPetIds: string[] = [];
+const createdVeterinarianIds: string[] = [];
+const createdAppointmentIds: string[] = [];
 
 beforeAll(async () => {
   app = await getApp();
 
   const email = `slot-test-${Date.now()}@test.com`;
+  createdEmails.push(email);
   const registerRes = await app.inject({
     method: "POST",
     url: "/api/v1/auth/register",
@@ -35,6 +40,7 @@ beforeAll(async () => {
   });
   expect(petRes.statusCode).toBe(201);
   petId = petRes.json().pet.id;
+  createdPetIds.push(petId);
 
   // Un vétérinaire tout neuf, garanti sans RDV résiduels en base (la base
   // est partagée entre tous les fichiers de test : laisser la suite dépendre
@@ -49,12 +55,14 @@ beforeAll(async () => {
   expect(adminLogin.statusCode).toBe(200);
   const adminToken = adminLogin.json().token;
 
+  const vetEmail = `appt-vet-${Date.now()}@test.com`;
+  createdEmails.push(vetEmail);
   const vetRes = await app.inject({
     method: "POST",
     url: "/api/v1/veterinarians",
     headers: { authorization: `Bearer ${adminToken}` },
     payload: {
-      email: `appt-vet-${Date.now()}@test.com`,
+      email: vetEmail,
       password: "TestPass123!",
       firstName: "Appt",
       lastName: "Vet", privacyConsent: true,
@@ -63,9 +71,16 @@ beforeAll(async () => {
   });
   expect(vetRes.statusCode).toBe(201);
   veterinarianId = vetRes.json().veterinarian.id;
+  createdVeterinarianIds.push(veterinarianId);
 });
 
 afterAll(async () => {
+  await deleteTestEntities({
+    userEmails: createdEmails,
+    petIds: createdPetIds,
+    veterinarianIds: createdVeterinarianIds,
+    appointmentIds: createdAppointmentIds,
+  });
   await closeApp();
 });
 
@@ -90,6 +105,7 @@ describe("Appointment slot overlap", () => {
       },
     });
     expect(res1.statusCode).toBe(201);
+    createdAppointmentIds.push(res1.json().appointment.id);
 
     // Second animal du même client, même vétérinaire, créneau identique -> conflit véto
     const pet2Res = await app.inject({
@@ -100,6 +116,7 @@ describe("Appointment slot overlap", () => {
     });
     expect(pet2Res.statusCode).toBe(201);
     const pet2Id = pet2Res.json().pet.id;
+    createdPetIds.push(pet2Id);
 
     const res2 = await app.inject({
       method: "POST",
@@ -138,6 +155,7 @@ describe("Appointment slot overlap", () => {
     });
 
     expect(res.statusCode).toBe(201);
+    createdAppointmentIds.push(res.json().appointment.id);
   });
 
   it("POST /api/v1/appointments — scheduledEnd <= scheduledStart rejetté (400)", async () => {
@@ -164,6 +182,7 @@ describe("Appointment slot overlap", () => {
 
   it("POST /api/v1/appointments — pet d'un autre CLIENT rejeté (403)", async () => {
     const email2 = `slot-test-b-${Date.now()}@test.com`;
+    createdEmails.push(email2);
     await app.inject({
       method: "POST",
       url: "/api/v1/auth/register",

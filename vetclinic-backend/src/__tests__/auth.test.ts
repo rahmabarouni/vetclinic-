@@ -1,23 +1,27 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getApp, closeApp } from "./helper";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { getApp, closeApp, prisma, deleteTestEntities } from "./helper";
 
 let app: any;
+const createdEmails: string[] = [];
 
 beforeAll(async () => {
   app = await getApp();
 });
 
 afterAll(async () => {
+  await deleteTestEntities({ userEmails: createdEmails });
   await closeApp();
-  await prisma.$disconnect();
 });
 
 describe("Auth", () => {
   const testEmail = `test-auth-${Date.now()}@test.com`;
   const testPassword = "SecurePass123!";
+
+  // Trace des users créés par ces tests, supprimés dans afterAll (cf. helper).
+  function trackEmail(email: string): string {
+    createdEmails.push(email);
+    return email;
+  }
 
   // NOTE HISTORIQUE (cause racine du test "email déjà vérifié" qui persistait) :
   // Le rate limiter (POST /auth/register et POST /auth/login : max 5 / minute)
@@ -40,7 +44,7 @@ describe("Auth", () => {
       url: "/api/v1/auth/register",
       remoteAddress: nextIp(),
       payload: {
-        email: testEmail,
+        email: trackEmail(testEmail),
         password: testPassword,
         firstName: "Test",
         lastName: "User",
@@ -61,7 +65,7 @@ describe("Auth", () => {
       url: "/api/v1/auth/register",
       remoteAddress: nextIp(),
       payload: {
-        email: `no-consent-${Date.now()}@test.com`,
+        email: trackEmail(`no-consent-${Date.now()}@test.com`),
         password: "SecurePass123!",
         firstName: "No",
         lastName: "Consent",
@@ -77,7 +81,7 @@ describe("Auth", () => {
       url: "/api/v1/auth/register",
       remoteAddress: nextIp(),
       payload: {
-        email: `consent-false-${Date.now()}@test.com`,
+        email: trackEmail(`consent-false-${Date.now()}@test.com`),
         password: "SecurePass123!",
         firstName: "False",
         lastName: "Consent",
@@ -158,7 +162,7 @@ const res = await app.inject({
         url: "/api/v1/auth/register",
         remoteAddress: nextIp(),
         payload: {
-          email: `otp-test-${Date.now()}@test.com`,
+          email: trackEmail(`otp-test-${Date.now()}@test.com`),
           password: "SecurePass123!",
           firstName: "OTP",
           lastName: "Test",
@@ -173,7 +177,7 @@ const res = await app.inject({
    });
 
    it("POST /api/v1/auth/verify-email — vérification réussie", async () => {
-const regEmail = `verify-${Date.now()}@test.com`;
+      const regEmail = trackEmail(`verify-${Date.now()}@test.com`);
       await app.inject({
         method: "POST",
         url: "/api/v1/auth/register",
@@ -214,7 +218,7 @@ const user = await prisma.user.findUnique({ where: { email: regEmail } });
     });
 
 it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
-      const regEmail = `bad-code-${Date.now()}@test.com`;
+      const regEmail = trackEmail(`bad-code-${Date.now()}@test.com`);
       await app.inject({
         method: "POST",
         url: "/api/v1/auth/register",
@@ -248,7 +252,7 @@ it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
     });
 
     it("POST /api/v1/auth/verify-email — email déjà vérifié (400)", async () => {
-      const regEmail = `already-verified-${Date.now()}@test.com`;
+      const regEmail = trackEmail(`already-verified-${Date.now()}@test.com`);
       await app.inject({
         method: "POST",
         url: "/api/v1/auth/register",
@@ -317,7 +321,7 @@ it("POST /api/v1/auth/verify-email — code invalide (400)", async () => {
     });
 
     it("POST /api/v1/auth/google — email déjà utilisé en LOCAL retourne 401 ou 403", async () => {
-      const existingEmail = `existing-google-${Date.now()}@test.com`;
+      const existingEmail = trackEmail(`existing-google-${Date.now()}@test.com`);
       await app.inject({
         method: "POST",
         url: "/api/v1/auth/register",

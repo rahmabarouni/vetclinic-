@@ -1,16 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getApp, closeApp } from "./helper";
+import { getApp, closeApp, deleteTestEntities } from "./helper";
 
 let app: any;
 let clientAToken: string;
 let clientBToken: string;
 let petAId: string;
+const createdEmails: string[] = [];
+const createdPetIds: string[] = [];
 
 beforeAll(async () => {
   app = await getApp();
 
   // Create client A
   const emailA = `owner-a-${Date.now()}@test.com`;
+  createdEmails.push(emailA);
   await app.inject({
     method: "POST",
     url: "/api/v1/auth/register",
@@ -25,6 +28,7 @@ beforeAll(async () => {
 
   // Create client B
   const emailB = `owner-b-${Date.now()}@test.com`;
+  createdEmails.push(emailB);
   await app.inject({
     method: "POST",
     url: "/api/v1/auth/register",
@@ -45,9 +49,11 @@ beforeAll(async () => {
     payload: { name: "Rex", species: "DOG", breed: "Berger" },
   });
   petAId = petRes.json().pet.id;
+  createdPetIds.push(petAId);
 });
 
 afterAll(async () => {
+  await deleteTestEntities({ userEmails: createdEmails, petIds: createdPetIds });
   await closeApp();
 });
 

@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getApp, closeApp } from "./helper";
+import { getApp, closeApp, deleteTestEntities } from "./helper";
 
 let app: any;
 let clientToken: string;
 let adminToken: string;
+const createdEmails: string[] = [];
 
 beforeAll(async () => {
   app = await getApp();
 
   // Register a fresh client
   const email = `rbac-client-${Date.now()}@test.com`;
+  createdEmails.push(email);
   await app.inject({
     method: "POST",
     url: "/api/v1/auth/register",
@@ -32,6 +34,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await deleteTestEntities({ userEmails: createdEmails });
   await closeApp();
 });
 
