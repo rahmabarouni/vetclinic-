@@ -27,6 +27,7 @@ export interface Appointment {
     id: string; userId: string; specialty: string | null;
     user: { id: string; email: string; firstName: string; lastName: string; role: string };
   } | null;
+  medicalRecord: { id: string } | null;
 }
 
 export interface PaginatedResponse<T> {

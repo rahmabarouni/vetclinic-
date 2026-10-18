@@ -141,6 +141,9 @@ export default function MedicalRecordsPage({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 409) {
+          throw new Error(data.error || 'Un dossier médical existe déjà pour ce rendez-vous.');
+        }
         throw new Error(data.error || `Erreur ${res.status}`);
       }
 
@@ -316,7 +319,7 @@ export default function MedicalRecordsPage({
         ) : (
           <div className="space-y-3">
             {records.map((rec) => (
-              <div key={rec.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div key={rec.id} id={`record-${rec.id}`} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 scroll-mt-24">
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${RECORD_TYPE_COLORS[rec.recordType] || 'bg-gray-100 text-gray-800'}`}>
                     {RECORD_TYPE_LABELS[rec.recordType] || rec.recordType}

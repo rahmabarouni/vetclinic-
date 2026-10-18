@@ -174,12 +174,21 @@ export default function AppointmentsPage() {
                       >
                         Voir le dossier médical
                       </Link>
-                      <Link
-                        href={`${recordBase}&new=1`}
-                        className="text-sm text-blue-600 hover:underline"
-                      >
-                        Ajouter une note de consultation
-                      </Link>
+                      {apt.medicalRecord ? (
+                        <Link
+                          href={`${recordBase}#record-${apt.medicalRecord.id}`}
+                          className="text-sm text-gray-600 hover:underline"
+                        >
+                          Voir la note
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`${recordBase}&new=1`}
+                          className="text-sm text-blue-600 hover:underline"
+                        >
+                          Ajouter une note de consultation
+                        </Link>
+                      )}
                     </div>
                   </div>
 

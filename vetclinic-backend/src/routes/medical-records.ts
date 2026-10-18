@@ -1,6 +1,6 @@
 import { logAudit } from "../utils/audit";
 import { FastifyInstance } from "fastify";
-import { MedicalRecordType, ReminderType } from "@prisma/client";
+import { MedicalRecordType, Prisma, ReminderType } from "@prisma/client";
 import { z } from "zod";
 
 const medicalRecordTypeValues = ["CONSULTATION", "VACCINATION", "SURGERY", "TREATMENT", "ALLERGY", "OTHER"] as const;
@@ -132,20 +132,37 @@ export default async function medicalRecordsRoutes(fastify: FastifyInstance) {
       if (!appointment || appointment.petId !== parsed.data.petId) {
         return reply.code(400).send({ error: "Rendez-vous invalide pour cet animal." });
       }
+
+      const existingRecord = await fastify.prisma.medicalRecord.findUnique({
+        where: { appointmentId: parsed.data.appointmentId },
+        select: { id: true },
+      });
+
+      if (existingRecord) {
+        return reply.code(409).send({ error: "Un dossier médical existe déjà pour ce rendez-vous." });
+      }
     }
 
-    const medicalRecord = await fastify.prisma.medicalRecord.create({
-      data: {
-        petId: parsed.data.petId,
-        appointmentId: parsed.data.appointmentId ?? null,
-        veterinarianId: parsed.data.veterinarianId,
-        recordType: parsed.data.recordType as MedicalRecordType,
-        title: parsed.data.title,
-        description: parsed.data.description,
-        diagnosis: parsed.data.diagnosis,
-      },
-      select: medicalRecordSelect,
-    });
+    let medicalRecord;
+    try {
+      medicalRecord = await fastify.prisma.medicalRecord.create({
+        data: {
+          petId: parsed.data.petId,
+          appointmentId: parsed.data.appointmentId ?? null,
+          veterinarianId: parsed.data.veterinarianId,
+          recordType: parsed.data.recordType as MedicalRecordType,
+          title: parsed.data.title,
+          description: parsed.data.description,
+          diagnosis: parsed.data.diagnosis,
+        },
+        select: medicalRecordSelect,
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return reply.code(409).send({ error: "Un dossier médical existe déjà pour ce rendez-vous." });
+      }
+      throw error;
+    }
 
     let reminder = null;
     if (parsed.data.recordType === "VACCINATION") {

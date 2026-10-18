@@ -75,6 +75,11 @@ const appointmentSelect = {
       },
     },
   },
+  medicalRecord: {
+    select: {
+      id: true,
+    },
+  },
 } as const;
 
 function overlaps(existingStart: Date, existingEnd: Date, nextStart: Date, nextEnd: Date) {
