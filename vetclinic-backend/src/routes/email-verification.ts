@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
-import nodemailer from "nodemailer";
+import { sendEmail } from "../services/mailer";
 
 const verifyEmailSchema = z.object({
   email: z.string().email(),
@@ -149,28 +149,12 @@ export default async function emailVerificationRoutes(fastify: FastifyInstance) 
         data: { userId, code, expiresAt },
       });
 
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || "smtp.ethereal.email",
-        port: parseInt((process.env.SMTP_PORT || "587") as string),
-        secure: false,
-        auth: {
-          user: process.env.SMTP_USER || "test@example.com",
-          pass: process.env.SMTP_PASS || "test",
-        },
+      await sendEmail({
+        to: email,
+        subject: "Vérification d'email VetClinic",
+        text: `Votre code de vérification est : ${code}`,
+        html: `<p>Votre code de vérification est : <strong>${code}</strong></p><p>Ce code expire dans 10 minutes.</p>`,
       });
-
-      try {
-        await transporter.sendMail({
-          from: `"VetClinic" <${(process.env.SMTP_USER || "test@example.com") as string}>`,
-          to: email,
-          subject: "Vérification d'email VetClinic",
-          text: `Votre code de vérification est : ${code}`,
-          html: `<p>Votre code de vérification est : <strong>${code}</strong></p><p>Ce code expire dans 10 minutes.</p>`,
-        });
-      } catch (err) {
-        fastify.log.error("Failed to send verification email");
-        console.error("Email send error:", err);
-      }
 
       return reply.send({ message: "Code de vérification envoyé." });
     }
