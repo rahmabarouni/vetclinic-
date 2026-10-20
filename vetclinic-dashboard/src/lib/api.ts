@@ -8,6 +8,17 @@ export interface User {
   role: string;
 }
 
+export interface PendingChangeRequest {
+  id: string;
+  proposedStart: string;
+  proposedEnd: string;
+  proposedType: string;
+  proposedReason: string | null;
+  status: string;
+  createdAt: string;
+  requestedById: string;
+}
+
 export interface Appointment {
   id: string;
   petId: string;
@@ -19,6 +30,7 @@ export interface Appointment {
   scheduledEnd: string;
   reason: string | null;
   cancellationReason: string | null;
+  reminderSentAt?: string | null;
   createdAt: string;
   updatedAt: string;
   pet: { id: string; name: string; species: string; breed: string | null; sex: string; ownerId: string };
@@ -28,6 +40,106 @@ export interface Appointment {
     user: { id: string; email: string; firstName: string; lastName: string; role: string };
   } | null;
   medicalRecord: { id: string } | null;
+  pendingChangeRequest?: PendingChangeRequest | null;
+}
+
+export interface ChangeRequest {
+  id: string;
+  appointmentId: string;
+  requestedById: string;
+  proposedStart: string;
+  proposedEnd: string;
+  proposedType: string;
+  proposedReason: string | null;
+  status: string;
+  responseNote: string | null;
+  resolvedAt: string | null;
+  resolvedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+  appointment: {
+    id: string;
+    scheduledStart: string;
+    scheduledEnd: string;
+    appointmentType: string;
+    status: string;
+    pet: { id: string; name: string; species: string };
+    client: { id: string; firstName: string; lastName: string; email: string };
+    veterinarian: { id: string; user: { firstName: string; lastName: string } } | null;
+  };
+  requestedBy: { id: string; firstName: string; lastName: string; role: string };
+  resolvedBy: { id: string; firstName: string; lastName: string } | null;
+}
+
+export interface ClientListItem {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  address: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  petsCount: number;
+  appointmentsCount: number;
+}
+
+export interface PetSummary {
+  id: string;
+  name: string;
+  species: string;
+  breed: string | null;
+  sex: string;
+  birthDate: string | null;
+  weightKg: number | null;
+  photoUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+  medicalRecordsCount: number;
+  appointmentsCount: number;
+  remindersCount: number;
+  documentsCount: number;
+}
+
+export interface ClientDetail {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  address: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  pets: PetSummary[];
+}
+
+export interface Conversation {
+  id: string;
+  clientId: string;
+  veterinarianId: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  client: { id: string; email: string; firstName: string; lastName: string; role: string };
+  veterinarian: {
+    id: string; userId: string; specialty: string | null;
+    user: { id: string; email: string; firstName: string; lastName: string; role: string };
+  } | null;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string | null;
+  attachmentUrl: string | null;
+  attachmentType: string | null;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+  sender: { id: string; email: string; firstName: string; lastName: string; role: string };
 }
 
 export interface PaginatedResponse<T> {
@@ -79,6 +191,8 @@ export interface DashboardStats {
   newClientsLast30Days: number;
   cancellationRate: { total: number; cancelled: number; rate: string };
   appointmentTypesLast30Days: Record<string, number>;
+  appointmentsByStatusLast30Days?: Record<string, number>;
+  appointmentsPerDay?: { date: string; count: number }[];
   unreadMessages: number;
 }
 

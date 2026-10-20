@@ -62,7 +62,7 @@ export default function MedicalRecordsPage({
   const veterinarianId = searchParams.veterinarianId ?? '';
   const vetName = searchParams.vetName ?? '';
 
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [records, setRecords] = useState<MedicalRecord[]>([]);
@@ -170,35 +170,23 @@ export default function MedicalRecordsPage({
 
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500">Chargement...</div>
-      </div>
+      <div className="text-muted py-12 text-center">Chargement...</div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <Link href="/dashboard/appointments" className="text-sm text-green-600 hover:underline">
-              &larr; Retour aux rendez-vous
-            </Link>
-            <h1 className="text-xl font-bold text-gray-900 mt-1">
-              Dossier médical{petName ? ` — ${petName}` : ''}
-            </h1>
-            <p className="text-xs text-gray-400">Animal: {petId}</p>
-          </div>
-          <button
-            onClick={() => { logout(); router.push('/login'); }}
-            className="text-sm text-gray-500 hover:text-red-600"
-          >
-            Déconnexion
-          </button>
-        </div>
+    <div>
+      <header className="mb-6">
+        <Link href="/dashboard/appointments" className="text-sm text-brand hover:underline">
+          &larr; Retour aux rendez-vous
+        </Link>
+        <h1 className="text-xl font-bold text-foreground mt-1">
+          Dossier médical{petName ? ` — ${petName}` : ''}
+        </h1>
+        <p className="text-xs text-muted">Animal: {petId}</p>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-4xl space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">
             Notes de consultation ({records.length})
@@ -372,7 +360,7 @@ export default function MedicalRecordsPage({
             </div>
           )}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

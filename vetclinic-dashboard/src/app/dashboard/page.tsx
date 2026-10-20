@@ -1,74 +1,64 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { DashboardStats } from '@/lib/api';
-
-const STATUS_ORDER = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const;
+import { STATUS_LABELS, TYPE_LABELS } from '@/lib/ui';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from 'recharts';
+import { CalendarCheck, UserPlus, Ban, MailWarning } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-800',
-  CONFIRMED: 'bg-green-100 text-green-800',
-  COMPLETED: 'bg-blue-100 text-blue-800',
-  CANCELLED: 'bg-red-100 text-red-800',
-  NO_SHOW: 'bg-gray-100 text-gray-800',
+  PENDING: '#f59e0b',
+  CONFIRMED: '#10b981',
+  COMPLETED: '#0ea5e9',
+  CANCELLED: '#f43f5e',
+  NO_SHOW: '#94a3b8',
 };
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: 'En attente',
-  CONFIRMED: 'Confirmé',
-  COMPLETED: 'Terminé',
-  CANCELLED: 'Annulé',
-  NO_SHOW: 'Absent',
-};
-
-const TYPE_LABELS: Record<string, string> = {
-  CONSULTATION: 'Consultation',
-  VACCINATION: 'Vaccination',
-  SURGERY: 'Chirurgie',
-  EMERGENCY: 'Urgence',
-  CHECKUP: 'Contrôle',
-  GROOMING: 'Toilettage',
-  OTHER: 'Autre',
-};
-
-const BAR_COLOR = 'bg-green-500';
 
 function StatCard({
   label,
   value,
   hint,
+  icon: Icon,
 }: {
   label: string;
   value: string | number;
   hint?: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
 }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-      <div className="text-sm text-gray-500">{label}</div>
-      <div className="text-3xl font-bold text-gray-900 mt-1">{value}</div>
-      {hint && <div className="text-xs text-gray-400 mt-1">{hint}</div>}
+    <div className="card p-5 flex items-start justify-between gap-4">
+      <div>
+        <div className="text-sm text-muted">{label}</div>
+        <div className="text-3xl font-bold text-foreground mt-1">{value}</div>
+        {hint && <div className="text-xs text-muted mt-1">{hint}</div>}
+      </div>
+      <div className="p-3 rounded-xl bg-brand-light text-brand">
+        <Icon size={24} />
+      </div>
     </div>
   );
 }
 
 export default function DashboardStatsPage() {
-  const { user, loading: authLoading, logout } = useAuth();
-  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (!user) return;
     setLoading(true);
     fetch('/api/proxy/dashboard/stats')
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Erreur ${res.status}`))))
@@ -80,129 +70,133 @@ export default function DashboardStatsPage() {
         setError(err.message);
         setLoading(false);
       });
-  }, [user]);
+  }, []);
 
-  if (authLoading || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500">Chargement...</div>
-      </div>
-    );
+  if (loading) {
+    return <div className="text-muted py-12 text-center">Chargement...</div>;
   }
 
-  if (!user) return null;
+  const perDay = (stats?.appointmentsPerDay ?? []).map((d) => ({
+    ...d,
+    label: `${d.date.slice(8, 10)}/${d.date.slice(5, 7)}`,
+  }));
 
-  const byStatus = stats?.appointmentsToday.byStatus ?? {};
   const types = stats?.appointmentTypesLast30Days ?? {};
-  const typeEntries = Object.entries(types).sort((a, b) => b[1] - a[1]);
-  const maxType = typeEntries.reduce((m, [, c]) => Math.max(m, c), 0);
+  const typeData = Object.entries(types)
+    .map(([type, count]) => ({ name: TYPE_LABELS[type] || type, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const byStatus30 = stats?.appointmentsByStatusLast30Days ?? {};
+  const statusData = Object.entries(byStatus30).map(([status, count]) => ({
+    name: STATUS_LABELS[status] || status,
+    value: count,
+    status,
+  }));
+
+  const total30 = statusData.reduce((sum, s) => sum + s.value, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">VetClinic Dashboard</h1>
-            <p className="text-sm text-gray-500">
-              {user.firstName} {user.lastName} — {user.role}
-            </p>
+    <div className="space-y-6">
+      <h1 className="text-xl font-bold text-foreground">Tableau de bord</h1>
+
+      {error && (
+        <div className="bg-rose-50 text-rose-700 px-4 py-3 rounded-xl text-sm">{error}</div>
+      )}
+
+      {!stats ? (
+        <div className="text-center py-12 text-muted">Aucune donnée</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              label="Rendez-vous aujourd'hui"
+              value={stats.appointmentsToday.total}
+              icon={CalendarCheck}
+            />
+            <StatCard label="Nouveaux clients (30 j)" value={stats.newClientsLast30Days} icon={UserPlus} />
+            <StatCard
+              label="Taux d'annulation (30 j)"
+              value={stats.cancellationRate.rate}
+              hint={`${stats.cancellationRate.cancelled} / ${stats.cancellationRate.total} RDV`}
+              icon={Ban}
+            />
+            <StatCard label="Messages non lus" value={stats.unreadMessages} icon={MailWarning} />
           </div>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link href="/dashboard" className="text-green-600 font-medium">
-              Statistiques
-            </Link>
-            <Link href="/dashboard/appointments" className="text-gray-600 hover:text-green-600">
-              Rendez-vous
-            </Link>
-            <button
-              onClick={() => { logout(); router.push('/login'); }}
-              className="text-gray-500 hover:text-red-600"
-            >
-              Déconnexion
-            </button>
-          </nav>
-        </div>
-      </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-        <h2 className="text-lg font-semibold text-gray-900">Statistiques</h2>
+          <div className="card p-5">
+            <h3 className="font-semibold text-foreground mb-4">Rendez-vous par jour (30 derniers jours)</h3>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={perDay} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e9f2" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={4} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    name="Rendez-vous"
+                    stroke="#4a7fc9"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
-        {error && (
-          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>
-        )}
-
-        {!stats ? (
-          <div className="text-center py-12 text-gray-400">Aucune donnée</div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                label="Rendez-vous aujourd'hui"
-                value={stats.appointmentsToday.total}
-              />
-              <StatCard
-                label="Nouveaux clients (30 j)"
-                value={stats.newClientsLast30Days}
-              />
-              <StatCard
-                label="Taux d'annulation (30 j)"
-                value={stats.cancellationRate.rate}
-                hint={`${stats.cancellationRate.cancelled} / ${stats.cancellationRate.total} RDV`}
-              />
-              <StatCard
-                label="Messages non lus"
-                value={stats.unreadMessages}
-              />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="card p-5">
+              <h3 className="font-semibold text-foreground mb-4">Types de rendez-vous (30 j)</h3>
+              <div className="h-72">
+                {typeData.length === 0 ? (
+                  <div className="text-muted text-sm">Aucun rendez-vous sur la période.</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={typeData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e9f2" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="count" name="Rendez-vous" fill="#4a7fc9" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-900 mb-3">
-                Rendez-vous du jour par statut
-              </h3>
-              {stats.appointmentsToday.total === 0 ? (
-                <div className="text-gray-400 text-sm">Aucun rendez-vous aujourd'hui.</div>
-              ) : (
-                <div className="flex flex-wrap gap-3">
-                  {STATUS_ORDER.filter((s) => byStatus[s]).map((s) => (
-                    <span
-                      key={s}
-                      className={`text-sm px-3 py-1 rounded-full font-medium ${STATUS_COLORS[s]}`}
-                    >
-                      {STATUS_LABELS[s]}: {byStatus[s]}
-                    </span>
-                  ))}
-                </div>
-              )}
+            <div className="card p-5">
+              <h3 className="font-semibold text-foreground mb-4">Statuts (30 j)</h3>
+              <div className="h-72">
+                {total30 === 0 ? (
+                  <div className="text-muted text-sm">Aucun rendez-vous sur la période.</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={statusData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={2}
+                      >
+                        {statusData.map((entry) => (
+                          <Cell key={entry.status} fill={STATUS_COLORS[entry.status] || '#94a3b8'} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-900 mb-3">
-                Types de rendez-vous (30 j)
-              </h3>
-              {typeEntries.length === 0 ? (
-                <div className="text-gray-400 text-sm">Aucun rendez-vous sur la période.</div>
-              ) : (
-                <div className="space-y-2">
-                  {typeEntries.map(([type, count]) => (
-                    <div key={type} className="flex items-center gap-3">
-                      <div className="w-32 text-sm text-gray-600 flex-shrink-0">
-                        {TYPE_LABELS[type] || type}
-                      </div>
-                      <div className="flex-1 bg-gray-100 rounded h-5 overflow-hidden">
-                        <div
-                          className={`h-full ${BAR_COLOR}`}
-                          style={{ width: maxType > 0 ? `${(count / maxType) * 100}%` : '0%' }}
-                        />
-                      </div>
-                      <div className="w-8 text-sm text-gray-700 text-right flex-shrink-0">{count}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </main>
+          </div>
+        </>
+      )}
     </div>
   );
 }
