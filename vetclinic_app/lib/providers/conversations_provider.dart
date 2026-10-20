@@ -134,13 +134,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   void connectWs(String conversationId, String token) {
     _messageSub?.cancel();
-    _ws.connect(conversationId, token);
     _messageSub = _ws.onMessage.listen((message) {
       final exists = state.messages.any((m) => m.id == message.id);
       if (!exists) {
         state = state.copyWith(messages: [...state.messages, message]);
       }
     });
+    _ws.connect(conversationId, token);
   }
 
   void sendMessage(String conversationId, {String? content}) {

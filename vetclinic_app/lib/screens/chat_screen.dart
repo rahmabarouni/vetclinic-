@@ -19,10 +19,12 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  ChatNotifier? _chatNotifier;
 
   @override
   void initState() {
     super.initState();
+    _chatNotifier = ref.read(chatProvider.notifier);
     _initChat();
   }
 
@@ -31,14 +33,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final token = await api.token;
     if (token == null || !mounted) return;
 
-    final chatNotifier = ref.read(chatProvider.notifier);
+    final chatNotifier = _chatNotifier;
+    if (chatNotifier == null) return;
     await chatNotifier.loadMessages(widget.conversation.id);
+    if (!mounted) return;
     chatNotifier.connectWs(widget.conversation.id, token);
   }
 
   @override
   void dispose() {
-    ref.read(chatProvider.notifier).disconnect();
+    _chatNotifier?.disconnect();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
