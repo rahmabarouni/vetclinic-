@@ -136,16 +136,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     }
 
-    final currentUserId = ref.read(authProvider).user?.id;
-
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
       itemCount: chatState.messages.length,
       itemBuilder: (context, index) {
         final message = chatState.messages[index];
-        final isMe = message.senderId == currentUserId;
-        return _MessageBubble(message: message, isMe: isMe);
+        final isClient = message.sender?.role == 'CLIENT';
+        return _MessageBubble(message: message, isMe: isClient);
       },
     );
   }

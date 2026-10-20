@@ -60,6 +60,22 @@ class _StubChatNotifier extends ChatNotifier {
             role: 'CLIENT',
           ),
         ),
+        Message(
+          id: 'm2',
+          conversationId: conversationId,
+          senderId: 'vet-user-1',
+          content: 'bonjour',
+          isRead: false,
+          createdAt: '2026-10-20T13:17:00.000Z',
+          updatedAt: '2026-10-20T13:17:00.000Z',
+          sender: MessageSender(
+            id: 'vet-user-1',
+            email: 'dr.martin@vetclinic.test',
+            firstName: 'Sophie',
+            lastName: 'Martin',
+            role: 'VETERINARIAN',
+          ),
+        ),
       ],
     );
   }
@@ -89,8 +105,23 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('hey'), findsOneWidget,
-        reason: 'Le contenu du message client doit être visible côté vétérinaire');
-    expect(find.text('Jean Dupont'), findsOneWidget);
+        reason: 'Le contenu du message client doit être visible');
+    expect(find.text('bonjour'), findsOneWidget,
+        reason: 'Le contenu du message véto doit être visible');
+
+    final clientText = tester.getCenter(find.text('hey'));
+    final vetText = tester.getCenter(find.text('bonjour'));
+    final screenCenter = tester.getCenter(find.byType(Scaffold)).dx;
+
+    expect(clientText.dx, greaterThan(screenCenter),
+        reason: 'Le message du client doit être aligné à droite');
+    expect(vetText.dx, lessThan(screenCenter),
+        reason: 'Le message du vétérinaire doit être aligné à gauche');
+
+    expect(find.text('Sophie Martin'), findsOneWidget,
+        reason: 'Le nom du véto s\'affiche sur ses messages (gauche)');
+    expect(find.text('Jean Dupont'), findsNothing,
+        reason: 'Le message client à droite n\'affiche pas son nom');
   });
 }
 
