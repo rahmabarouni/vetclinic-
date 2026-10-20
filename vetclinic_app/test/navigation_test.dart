@@ -43,6 +43,14 @@ class _FakeApiService extends ApiService {
   Future<Map<String, dynamic>> getVeterinarians({bool availableOnly = false}) async {
     return {'data': <dynamic>[], 'pagination': {'page': 1, 'limit': 20, 'total': 0, 'totalPages': 0}};
   }
+
+  @override
+  Future<Map<String, dynamic>> getNotifications({int page = 1, int limit = 20}) async {
+    return {'data': <dynamic>[], 'pagination': {'page': 1, 'limit': 20, 'total': 0, 'totalPages': 0}};
+  }
+
+  @override
+  Future<int> getUnreadNotificationCount() async => 0;
 }
 
 class _FakeAuthNotifier extends AuthNotifier {
