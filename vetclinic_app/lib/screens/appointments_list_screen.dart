@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/appointment.dart';
 import '../providers/appointments_provider.dart';
-import '../utils/date_utils.dart';
+import '../theme/app_theme.dart';
+import '../utils/calendar_utils.dart';
+import '../utils/date_utils.dart' as du;
 import 'appointment_form_screen.dart';
 
 class AppointmentsListScreen extends ConsumerStatefulWidget {
@@ -30,6 +33,7 @@ class _AppointmentsListScreenState extends ConsumerState<AppointmentsListScreen>
             ref.read(appointmentsProvider.notifier).refresh();
           }
         },
+        tooltip: 'Nouveau rendez-vous',
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -45,7 +49,7 @@ class _AppointmentsListScreenState extends ConsumerState<AppointmentsListScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const Icon(Icons.error_outline, size: 48, color: AppColors.error),
               const SizedBox(height: 16),
               Text(state.error ?? 'Erreur inconnue'),
               const SizedBox(height: 16),
@@ -62,7 +66,7 @@ class _AppointmentsListScreenState extends ConsumerState<AppointmentsListScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.event, size: 64, color: Colors.grey),
+                Icon(Icons.event_busy_outlined, size: 64, color: Colors.grey),
                 SizedBox(height: 16),
                 Text('Aucun rendez-vous', style: TextStyle(fontSize: 18, color: Colors.grey)),
                 SizedBox(height: 8),
@@ -81,10 +85,41 @@ class _AppointmentsListScreenState extends ConsumerState<AppointmentsListScreen>
               return _AppointmentCard(
                 appointment: appointment,
                 onCancel: () => _confirmCancel(appointment),
+                onModify: () => _modify(appointment),
+                onAddToCalendar: () => _addToCalendar(appointment),
               );
             },
           ),
         );
+    }
+  }
+
+  Future<void> _modify(Appointment appointment) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AppointmentFormScreen(appointment: appointment)),
+    );
+    if (result == true) {
+      ref.read(appointmentsProvider.notifier).refresh();
+    }
+  }
+
+  Future<void> _addToCalendar(Appointment appointment) async {
+    final start = DateTime.parse(appointment.scheduledStart).toLocal();
+    final end = DateTime.parse(appointment.scheduledEnd).toLocal();
+    final url = buildGoogleCalendarUrl(
+      title: 'PawCare — ${appointment.typeLabel}',
+      details: appointment.reason?.isNotEmpty == true ? appointment.reason! : 'Rendez-vous vétérinaire',
+      start: start,
+      end: end,
+    );
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible d\'ouvrir Google Agenda'), backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 
@@ -93,7 +128,7 @@ class _AppointmentsListScreenState extends ConsumerState<AppointmentsListScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Annuler le rendez-vous'),
-        content: Text('Voulez-vous annuler le rendez-vous du ${formatDate(appointment.scheduledStart)} ?'),
+        content: Text('Voulez-vous annuler le rendez-vous du ${du.formatDate(appointment.scheduledStart)} ?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Non')),
           TextButton(
@@ -101,30 +136,36 @@ class _AppointmentsListScreenState extends ConsumerState<AppointmentsListScreen>
               Navigator.pop(ctx);
               ref.read(appointmentsProvider.notifier).cancelAppointment(appointment.id);
             },
-            child: const Text('Oui', style: TextStyle(color: Colors.red)),
+            child: const Text('Oui', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
     );
   }
-
 }
 
 class _AppointmentCard extends StatelessWidget {
   final Appointment appointment;
   final VoidCallback onCancel;
-  const _AppointmentCard({required this.appointment, required this.onCancel});
+  final VoidCallback onModify;
+  final VoidCallback onAddToCalendar;
+  const _AppointmentCard({
+    required this.appointment,
+    required this.onCancel,
+    required this.onModify,
+    required this.onAddToCalendar,
+  });
 
   Color _statusColor(String status) {
     switch (status) {
       case 'CONFIRMED':
-        return Colors.green;
+        return AppColors.success;
       case 'PENDING':
-        return Colors.orange;
+        return AppColors.accent;
       case 'CANCELLED':
-        return Colors.red;
+        return AppColors.error;
       case 'COMPLETED':
-        return Colors.blue;
+        return AppColors.primary;
       default:
         return Colors.grey;
     }
@@ -132,35 +173,115 @@ class _AppointmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canModify = appointment.isModifiable;
+    final hasPending = appointment.hasPendingChangeRequest;
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      child: ListTile(
-        title: Text(
-          appointment.typeLabel,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (appointment.pet != null)
-              Text(appointment.pet!.name),
-            Text(formatDate(appointment.scheduledStart)),
-            if (appointment.reason != null && appointment.reason!.isNotEmpty)
-              Text(appointment.reason!, style: const TextStyle(fontSize: 12)),
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: _statusColor(appointment.status).withAlpha(26),
+                  child: Icon(Icons.event, color: _statusColor(appointment.status)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appointment.typeLabel,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      if (appointment.pet != null)
+                        Text(appointment.pet!.name, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+                      Text(du.formatDate(appointment.scheduledStart),
+                          style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+                      if (appointment.reason != null && appointment.reason!.isNotEmpty)
+                        Text(appointment.reason!, style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+                _StatusChip(color: _statusColor(appointment.status), label: appointment.statusLabel),
+              ],
+            ),
+            if (hasPending)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, right: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withAlpha(26),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.hourglass_top, size: 16, color: AppColors.accent),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Modification en attente : ${du.formatDate(appointment.pendingChangeRequest!.proposedStart)}',
+                          style: const TextStyle(fontSize: 12, color: AppColors.primaryDark),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    tooltip: 'Ajouter à Google Agenda',
+                    icon: const Icon(Icons.calendar_month, color: AppColors.primary),
+                    onPressed: onAddToCalendar,
+                  ),
+                  if (canModify)
+                    IconButton(
+                      tooltip: 'Modifier',
+                      icon: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                      onPressed: onModify,
+                    ),
+                  if (appointment.status == 'PENDING' || appointment.status == 'CONFIRMED')
+                    IconButton(
+                      tooltip: 'Annuler',
+                      icon: const Icon(Icons.cancel_outlined, color: AppColors.error),
+                      onPressed: onCancel,
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
-        leading: CircleAvatar(
-          backgroundColor: _statusColor(appointment.status).withAlpha(26),
-          child: Icon(Icons.event, color: _statusColor(appointment.status)),
-        ),
-        trailing: appointment.status == 'PENDING'
-            ? IconButton(
-                icon: const Icon(Icons.cancel, color: Colors.red),
-                onPressed: onCancel,
-              )
-            : null,
       ),
     );
   }
+}
 
+class _StatusChip extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _StatusChip({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(26),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
 }

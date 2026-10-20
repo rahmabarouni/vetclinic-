@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'notifications_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -169,10 +170,15 @@ class ProfileScreen extends ConsumerWidget {
           Card(
             child: Column(
               children: [
-                const ListTile(
-                  leading: Icon(Icons.notifications_outlined, color: AppColors.primary),
-                  title: Text('Notifications push'),
-                  subtitle: Text('Rappels de rendez-vous et messages'),
+                ListTile(
+                  leading: const Icon(Icons.notifications_outlined, color: AppColors.primary),
+                  title: const Text('Notifications'),
+                  subtitle: const Text('Rappels de rendez-vous et messages'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                  ),
                 ),
                 const Divider(height: 1),
                 ListTile(

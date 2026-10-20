@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/appointment.dart';
 import '../models/veterinarian.dart';
 import '../providers/appointments_provider.dart';
 import '../providers/pets_provider.dart';
 import '../theme/app_theme.dart';
-import '../utils/date_utils.dart';
+import '../utils/date_utils.dart' as du;
 import 'veterinarian_picker_screen.dart';
 
 class AppointmentFormScreen extends ConsumerStatefulWidget {
-  const AppointmentFormScreen({super.key});
+  /// Renseigné pour modifier un rendez-vous existant via une demande de
+  /// modification. `null` pour créer un nouveau rendez-vous.
+  final Appointment? appointment;
+
+  const AppointmentFormScreen({super.key, this.appointment});
+
+  bool get isEditing => appointment != null;
 
   @override
   ConsumerState<AppointmentFormScreen> createState() => _AppointmentFormScreenState();
@@ -28,6 +35,15 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
   @override
   void initState() {
     super.initState();
+    final appointment = widget.appointment;
+    if (appointment != null) {
+      _selectedPetId = appointment.petId;
+      _appointmentType = appointment.appointmentType;
+      final start = DateTime.parse(appointment.scheduledStart).toLocal();
+      _selectedDate = DateTime(start.year, start.month, start.day);
+      _selectedTime = TimeOfDay(hour: start.hour, minute: start.minute);
+      _reasonController.text = appointment.reason ?? '';
+    }
     final petsState = ref.read(petsProvider);
     if (petsState.status == PetsStatus.initial) {
       ref.read(petsProvider.notifier).loadPets();
@@ -92,7 +108,7 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
     setState(() => _currentStep++);
   }
 
-  int get _stepCount => 4;
+  int get _stepCount => widget.isEditing ? 3 : 4;
 
   void _onStepCancel() {
     if (_currentStep == 0) return;
@@ -104,25 +120,51 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
 
     final start = _buildStart();
     final end = start.add(const Duration(hours: 1));
+    final reason = _reasonController.text.trim().isEmpty ? null : _reasonController.text.trim();
 
-    final success = await ref.read(appointmentsProvider.notifier).createAppointment(
-          petId: _selectedPetId!,
-          appointmentType: _appointmentType,
-          scheduledStart: start,
-          scheduledEnd: end,
-          reason: _reasonController.text.trim().isEmpty ? null : _reasonController.text.trim(),
-          veterinarianId: _selectedVeterinarian?.id,
-        );
+    final bool success;
+    final bool applied;
+
+    if (widget.isEditing) {
+      success = await ref.read(appointmentsProvider.notifier).requestChange(
+            appointmentId: widget.appointment!.id,
+            proposedStart: start,
+            proposedEnd: end,
+            proposedType: _appointmentType,
+            proposedReason: reason,
+          );
+      applied = ref.read(appointmentsProvider.notifier).lastChangeApplied;
+    } else {
+      success = await ref.read(appointmentsProvider.notifier).createAppointment(
+            petId: _selectedPetId!,
+            appointmentType: _appointmentType,
+            scheduledStart: start,
+            scheduledEnd: end,
+            reason: reason,
+            veterinarianId: _selectedVeterinarian?.id,
+          );
+      applied = false;
+    }
 
     if (!mounted) return;
     setState(() => _submitting = false);
 
     if (success) {
+      if (widget.isEditing) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(applied
+                ? 'Modification appliquée immédiatement'
+                : 'Demande de modification envoyée au vétérinaire'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
       Navigator.pop(context, true);
     } else {
       final error = ref.read(appointmentsProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error ?? 'Erreur lors de la création'), backgroundColor: AppColors.error),
+        SnackBar(content: Text(error ?? 'Erreur lors de l\'enregistrement'), backgroundColor: AppColors.error),
       );
     }
   }
@@ -150,7 +192,9 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
                   items: pets.map((pet) {
                     return DropdownMenuItem(value: pet.id, child: Text(pet.name));
                   }).toList(),
-                  onChanged: (v) => setState(() => _selectedPetId = v),
+                  onChanged: widget.isEditing
+                      ? null
+                      : (v) => setState(() => _selectedPetId = v),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -179,42 +223,43 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
               ],
             ),
           ),
-          Step(
-            title: const Text('Vétérinaire'),
-            content: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Card(
-                  margin: EdgeInsets.zero,
-                  child: ListTile(
-                    onTap: _pickVeterinarian,
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.primaryLight,
-                      child: const Icon(Icons.medical_services, color: AppColors.primary),
+          if (!widget.isEditing)
+            Step(
+              title: const Text('Vétérinaire'),
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Card(
+                    margin: EdgeInsets.zero,
+                    child: ListTile(
+                      onTap: _pickVeterinarian,
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.primaryLight,
+                        child: const Icon(Icons.medical_services, color: AppColors.primary),
+                      ),
+                      title: Text(
+                        _selectedVeterinarian?.displayName ?? 'Choisir un vétérinaire',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        _selectedVeterinarian == null
+                            ? 'Sans préférence — attribué automatiquement'
+                            : (_selectedVeterinarian!.specialty.isEmpty
+                                ? 'Vétérinaire généraliste'
+                                : _selectedVeterinarian!.specialty),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
                     ),
-                    title: Text(
-                      _selectedVeterinarian?.displayName ?? 'Choisir un vétérinaire',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      _selectedVeterinarian == null
-                          ? 'Sans préférence — attribué automatiquement'
-                          : (_selectedVeterinarian!.specialty.isEmpty
-                              ? 'Vétérinaire généraliste'
-                              : _selectedVeterinarian!.specialty),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
                   ),
-                ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () => setState(() => _selectedVeterinarian = null),
-                  icon: const Icon(Icons.clear),
-                  label: const Text('Sans préférence'),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () => setState(() => _selectedVeterinarian = null),
+                    icon: const Icon(Icons.clear),
+                    label: const Text('Sans préférence'),
+                  ),
+                ],
+              ),
             ),
-          ),
           Step(
             title: const Text('Service'),
             content: Column(
@@ -260,18 +305,28 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
                     _SummaryRow(label: 'Animal', value: selectedPet?.name ?? '—'),
                     _SummaryRow(
                       label: 'Date',
-                      value: formatDate(_buildStart().toIso8601String()),
+                      value: du.formatDate(_buildStart().toIso8601String()),
                     ),
-                    _SummaryRow(
-                      label: 'Vétérinaire',
-                      value: _selectedVeterinarian?.displayName ?? 'Sans préférence',
-                    ),
+                    if (!widget.isEditing)
+                      _SummaryRow(
+                        label: 'Vétérinaire',
+                        value: _selectedVeterinarian?.displayName ?? 'Sans préférence',
+                      ),
                     _SummaryRow(
                       label: 'Service',
                       value: _appointmentTypeLabel,
                     ),
                     if (_reasonController.text.trim().isNotEmpty)
                       _SummaryRow(label: 'Motif', value: _reasonController.text.trim()),
+                    if (widget.isEditing) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.appointment!.status == 'PENDING'
+                            ? 'Ce rendez-vous n\'est pas encore confirmé : la modification sera appliquée directement.'
+                            : 'Le vétérinaire devra approuver cette modification avant son application.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -280,7 +335,9 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
         ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Nouveau rendez-vous')),
+      appBar: AppBar(
+        title: Text(widget.isEditing ? 'Modifier le rendez-vous' : 'Nouveau rendez-vous'),
+      ),
       body: Stepper(
         currentStep: _currentStep,
         onStepContinue: _onStepContinue,
@@ -303,7 +360,9 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : Text(isLast ? 'Créer le rendez-vous' : 'Suivant'),
+                        : Text(isLast
+                            ? (widget.isEditing ? 'Envoyer la demande' : 'Créer le rendez-vous')
+                            : 'Suivant'),
                   ),
                 ),
                 if (_currentStep > 0) ...[

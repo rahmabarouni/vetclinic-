@@ -4,10 +4,12 @@ import '../models/appointment.dart';
 import '../models/pet.dart';
 import '../providers/appointments_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/notifications_provider.dart';
 import '../providers/pets_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_utils.dart';
 import 'appointment_form_screen.dart';
+import 'notifications_screen.dart';
 import 'pet_detail_screen.dart';
 import 'pet_form_screen.dart';
 import 'pets_list_screen.dart';
@@ -20,10 +22,53 @@ class HomeScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final petsState = ref.watch(petsProvider);
     final appointmentsState = ref.watch(appointmentsProvider);
+    final unreadCount = ref.watch(notificationsProvider.select((s) => s.unreadCount));
 
     final nextAppointment = _nextUpcoming(appointmentsState);
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('PawCare'),
+        centerTitle: false,
+        actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              );
+              if (context.mounted) {
+                ref.read(notificationsProvider.notifier).refreshUnreadCount();
+              }
+            },
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_none),
+                if (unreadCount > 0)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      constraints: const BoxConstraints(minWidth: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        unreadCount > 99 ? '99+' : '$unreadCount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           await ref.read(petsProvider.notifier).refresh();
