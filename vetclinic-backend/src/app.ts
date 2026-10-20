@@ -13,6 +13,7 @@ import authRoutes from "./routes/auth";
 import emailVerificationRoutes from "./routes/email-verification";
 import petsRoutes from "./routes/pets";
 import appointmentsRoutes from "./routes/appointments";
+import appointmentChangeRequestRoutes from "./routes/appointment-change-requests";
 import timeSlotBlockRoutes from "./routes/time-slot-blocks";
 import medicalRecordsRoutes from "./routes/medical-records";
 import conversationsRoutes from "./routes/conversations";
@@ -64,6 +65,7 @@ export async function buildApp() {
   await fastify.register(emailVerificationRoutes, { prefix: "/api/v1" });
   await fastify.register(petsRoutes, { prefix: "/api/v1" });
   await fastify.register(appointmentsRoutes, { prefix: "/api/v1" });
+  await fastify.register(appointmentChangeRequestRoutes, { prefix: "/api/v1" });
   await fastify.register(timeSlotBlockRoutes, { prefix: "/api/v1" });
   await fastify.register(medicalRecordsRoutes, { prefix: "/api/v1" });
   await fastify.register(conversationsRoutes, { prefix: "/api/v1" });

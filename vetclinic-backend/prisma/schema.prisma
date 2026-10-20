@@ -45,6 +45,8 @@ model User {
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
   emailVerificationCodes EmailVerificationCode[]
+  changeRequestsAuthored  AppointmentChangeRequest[] @relation("ChangeRequestAuthor")
+  changeRequestsResolved  AppointmentChangeRequest[] @relation("ChangeRequestResolver")
 
   @@map("users")
 }
@@ -224,6 +226,7 @@ model Appointment {
   scheduledEnd       DateTime          @map("scheduled_end")
   reason             String?
   cancellationReason String?           @map("cancellation_reason")
+  reminderSentAt     DateTime?         @map("reminder_sent_at")
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
@@ -231,8 +234,40 @@ model Appointment {
   client        User           @relation("ClientAppointments", fields: [clientId], references: [id], onDelete: Cascade)
   veterinarian  Veterinarian?  @relation("VeterinarianAppointments", fields: [veterinarianId], references: [id], onDelete: SetNull)
   medicalRecord MedicalRecord?
+  changeRequests AppointmentChangeRequest[]
 
   @@map("appointments")
+}
+
+enum AppointmentChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AppointmentChangeRequest {
+  id             String                          @id @default(uuid())
+  appointmentId  String                          @map("appointment_id")
+  requestedById  String                          @map("requested_by_id")
+  proposedStart  DateTime                        @map("proposed_start")
+  proposedEnd    DateTime                        @map("proposed_end")
+  proposedType   AppointmentType                 @map("proposed_type")
+  proposedReason String?                         @map("proposed_reason")
+  status         AppointmentChangeRequestStatus  @default(PENDING)
+  responseNote   String?                         @map("response_note")
+  resolvedAt     DateTime?                       @map("resolved_at")
+  resolvedById   String?                         @map("resolved_by_id")
+  createdAt      DateTime                        @default(now()) @map("created_at")
+  updatedAt      DateTime                        @updatedAt @map("updated_at")
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  requestedBy User        @relation("ChangeRequestAuthor", fields: [requestedById], references: [id], onDelete: Cascade)
+  resolvedBy  User?       @relation("ChangeRequestResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([appointmentId])
+  @@index([status])
+  @@index([requestedById])
+  @@map("appointment_change_requests")
 }
 
 enum PetSpecies {
