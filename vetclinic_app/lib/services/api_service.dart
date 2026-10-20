@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
@@ -7,7 +9,12 @@ class ApiService {
 
   static const String _tokenKey = 'jwt_token';
 
-  static const String defaultBaseUrl = 'http://10.0.2.2:3000';
+  static String get defaultBaseUrl =>
+      (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+          ? 'http://10.0.2.2:3000'
+          : 'http://localhost:3000';
+
+  static String get wsBaseUrl => defaultBaseUrl.replaceFirst('http://', 'ws://');
 
   ApiService({String? baseUrl})
       : _dio = Dio(BaseOptions(
@@ -208,6 +215,56 @@ class ApiService {
   Future<Map<String, dynamic>> cancelAppointment(String id) async {
     final response = await _dio.delete('/api/v1/appointments/$id');
     return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createChangeRequest(
+    String appointmentId, {
+    required DateTime proposedStart,
+    required DateTime proposedEnd,
+    String? proposedType,
+    String? proposedReason,
+  }) async {
+    final response = await _dio.post(
+      '/api/v1/appointments/$appointmentId/change-requests',
+      data: {
+        'proposedStart': proposedStart.toUtc().toIso8601String(),
+        'proposedEnd': proposedEnd.toUtc().toIso8601String(),
+        'proposedType': ?proposedType,
+        'proposedReason': ?proposedReason,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getChangeRequests({int page = 1, int limit = 20, String? status}) async {
+    final queryParams = <String, dynamic>{'page': page, 'limit': limit};
+    if (status != null && status.isNotEmpty) queryParams['status'] = status;
+    final response = await _dio.get('/api/v1/change-requests', queryParameters: queryParams);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getNotifications({int page = 1, int limit = 20}) async {
+    final response = await _dio.get('/api/v1/notifications',
+        queryParameters: {'page': page, 'limit': limit});
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<int> getUnreadNotificationCount() async {
+    final response = await _dio.get('/api/v1/notifications/unread-count');
+    final data = response.data as Map<String, dynamic>;
+    return (data['count'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    await _dio.patch('/api/v1/notifications/$id/read', data: <String, dynamic>{});
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    await _dio.patch('/api/v1/notifications/read-all', data: <String, dynamic>{});
+  }
+
+  Future<void> deleteNotification(String id) async {
+    await _dio.delete('/api/v1/notifications/$id', data: <String, dynamic>{});
   }
 
   Future<Map<String, dynamic>> getVeterinarians({bool availableOnly = false}) async {

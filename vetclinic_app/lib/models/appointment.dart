@@ -9,10 +9,12 @@ class Appointment {
   final String scheduledEnd;
   final String? reason;
   final String? cancellationReason;
+  final String? reminderSentAt;
   final String createdAt;
   final String updatedAt;
   final AppointmentPet? pet;
   final AppointmentClient? client;
+  final ChangeRequest? pendingChangeRequest;
 
   Appointment({
     required this.id,
@@ -25,10 +27,12 @@ class Appointment {
     required this.scheduledEnd,
     this.reason,
     this.cancellationReason,
+    this.reminderSentAt,
     required this.createdAt,
     required this.updatedAt,
     this.pet,
     this.client,
+    this.pendingChangeRequest,
   });
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
@@ -43,6 +47,7 @@ class Appointment {
       scheduledEnd: json['scheduledEnd'] as String,
       reason: json['reason'] as String?,
       cancellationReason: json['cancellationReason'] as String?,
+      reminderSentAt: json['reminderSentAt'] as String?,
       createdAt: json['createdAt'] as String? ?? '',
       updatedAt: json['updatedAt'] as String? ?? '',
       pet: json['pet'] != null
@@ -51,8 +56,18 @@ class Appointment {
       client: json['client'] != null
           ? AppointmentClient.fromJson(json['client'] as Map<String, dynamic>)
           : null,
+      pendingChangeRequest: json['pendingChangeRequest'] != null
+          ? ChangeRequest.fromJson(
+              json['pendingChangeRequest'] as Map<String, dynamic>)
+          : null,
     );
   }
+
+  bool get hasPendingChangeRequest => pendingChangeRequest != null;
+
+  bool get isModifiable =>
+      (status == 'PENDING' || status == 'CONFIRMED') &&
+      DateTime.parse(scheduledStart).isAfter(DateTime.now());
 
   Map<String, dynamic> toJson() {
     return {
@@ -127,5 +142,59 @@ class AppointmentClient {
       firstName: json['firstName'] as String,
       lastName: json['lastName'] as String,
     );
+  }
+}
+
+class ChangeRequest {
+  final String id;
+  final String appointmentId;
+  final String? requestedById;
+  final String proposedStart;
+  final String proposedEnd;
+  final String? proposedType;
+  final String? proposedReason;
+  final String status;
+  final String? responseNote;
+  final String createdAt;
+
+  ChangeRequest({
+    required this.id,
+    required this.appointmentId,
+    this.requestedById,
+    required this.proposedStart,
+    required this.proposedEnd,
+    this.proposedType,
+    this.proposedReason,
+    required this.status,
+    this.responseNote,
+    required this.createdAt,
+  });
+
+  factory ChangeRequest.fromJson(Map<String, dynamic> json) {
+    return ChangeRequest(
+      id: json['id'] as String,
+      appointmentId: json['appointmentId'] as String? ?? '',
+      requestedById: json['requestedById'] as String?,
+      proposedStart: json['proposedStart'] as String? ?? '',
+      proposedEnd: json['proposedEnd'] as String? ?? '',
+      proposedType: json['proposedType'] as String?,
+      proposedReason: json['proposedReason'] as String?,
+      status: json['status'] as String? ?? 'PENDING',
+      responseNote: json['responseNote'] as String?,
+      createdAt: json['createdAt'] as String? ?? '',
+    );
+  }
+
+  String get statusLabel {
+    switch (status) {
+      case 'PENDING':
+        return 'En attente';
+      case 'APPROVED':
+        return 'Approuvée';
+      case 'REJECTED':
+        return 'Refusée';
+      default:
+        return status;
+    }
   }
 }

@@ -96,6 +96,42 @@ class AppointmentsNotifier extends StateNotifier<AppointmentsState> {
     }
   }
 
+  bool _lastChangeApplied = false;
+  bool get lastChangeApplied => _lastChangeApplied;
+
+  Future<bool> requestChange({
+    required String appointmentId,
+    required DateTime proposedStart,
+    required DateTime proposedEnd,
+    String? proposedType,
+    String? proposedReason,
+  }) async {
+    state = state.copyWith(status: AppointmentsStatus.loading);
+    try {
+      final data = await _api.createChangeRequest(
+        appointmentId,
+        proposedStart: proposedStart,
+        proposedEnd: proposedEnd,
+        proposedType: proposedType,
+        proposedReason: proposedReason,
+      );
+      _lastChangeApplied = data['applied'] == true;
+      await loadAppointments(page: state.page);
+      return true;
+    } catch (e) {
+      String message = 'Erreur lors de la demande de modification';
+      if (e.toString().contains('409')) {
+        message = 'Créneau indisponible ou demande déjà en attente';
+      } else if (e.toString().contains('403')) {
+        message = 'Accès refusé';
+      } else if (e.toString().contains('400')) {
+        message = 'Données invalides';
+      }
+      state = state.copyWith(status: AppointmentsStatus.error, error: message);
+      return false;
+    }
+  }
+
   Future<bool> cancelAppointment(String id) async {
     try {
       await _api.cancelAppointment(id);

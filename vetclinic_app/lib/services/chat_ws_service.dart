@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/message.dart';
+import 'api_service.dart';
 
 enum WsConnectionStatus { disconnected, connecting, connected }
 
@@ -41,7 +42,7 @@ class ChatWsService {
     _closeExisting();
 
     final uri = Uri.parse(
-      'ws://10.0.2.2:3000/api/v1/ws/conversations/$_conversationId?token=$_token',
+      '${ApiService.wsBaseUrl}/api/v1/ws/conversations/$_conversationId?token=$_token',
     );
 
     try {
