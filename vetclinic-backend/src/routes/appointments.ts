@@ -3,7 +3,10 @@ import { AppointmentStatus, AppointmentType } from "@prisma/client";
 import { z } from "zod";
 import { getPaginationParams, paginatedResponse, searchFilter } from "../utils/pagination";
 import { notifyUser } from "../services/notify";
-import { sendAppointmentEmail, formatDisplayDateTime } from "../services/appointment-emails";
+import {
+  formatDisplayDateTime,
+  sendAppointmentEventEmail,
+} from "../services/appointment-emails";
 import { petHasAvailabilityConflict, veterinarianHasAvailabilityConflict } from "../utils/availability";
 
 const appointmentTypeValues = ["CONSULTATION", "VACCINATION", "SURGERY", "EMERGENCY", "CHECKUP", "GROOMING", "OTHER"] as const;
@@ -294,28 +297,48 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
         select: { email: true },
       });
       if (client?.email) {
-        await sendAppointmentEmail(fastify, {
+        await sendAppointmentEventEmail(fastify, {
+          kind: "confirmed",
           to: client.email,
-          subject: "Votre rendez-vous est confirmé",
-          heading: "Rendez-vous confirmé",
-          lines: [
-            `Animal : ${pet.name}`,
-            `Date : ${formatDisplayDateTime(appointment.scheduledStart)}`,
-            `Type : ${appointment.appointmentType}`,
-          ],
-          footer: "Vous pouvez consulter ce rendez-vous dans l'application VetClinic.",
+          ctx: {
+            appointmentId: appointment.id,
+            petName: pet.name,
+            type: appointment.appointmentType,
+            start: appointment.scheduledStart,
+            end: appointment.scheduledEnd,
+          },
         });
       }
-    } else if (appointment.veterinarian?.userId) {
-      try {
-        await notifyUser(fastify, {
-          recipientId: appointment.veterinarian.userId,
-          type: "APPOINTMENT",
-          title: "Nouvelle demande de rendez-vous",
-          body: `${appointment.pet?.name ?? "Un animal"} — ${appointment.appointmentType}`,
+    } else {
+      if (appointment.veterinarian?.userId) {
+        try {
+          await notifyUser(fastify, {
+            recipientId: appointment.veterinarian.userId,
+            type: "APPOINTMENT",
+            title: "Nouvelle demande de rendez-vous",
+            body: `${appointment.pet?.name ?? "Un animal"} — ${appointment.appointmentType}`,
+          });
+        } catch (err) {
+          fastify.log.error("Notification RDV échouée: %s", String(err));
+        }
+      }
+
+      const client = await fastify.prisma.user.findUnique({
+        where: { id: clientId },
+        select: { email: true },
+      });
+      if (client?.email) {
+        await sendAppointmentEventEmail(fastify, {
+          kind: "requested",
+          to: client.email,
+          ctx: {
+            appointmentId: appointment.id,
+            petName: pet.name,
+            type: appointment.appointmentType,
+            start: appointment.scheduledStart,
+            end: appointment.scheduledEnd,
+          },
         });
-      } catch (err) {
-        fastify.log.error("Notification RDV échouée: %s", String(err));
       }
     }
 
@@ -469,15 +492,14 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
           ...(parsedBody.data.scheduledEnd ? { scheduledEnd: parsedBody.data.scheduledEnd } : {}),
           ...(nextType ? { appointmentType: nextType as AppointmentType } : {}),
           ...(parsedBody.data.reason !== undefined ? { reason: parsedBody.data.reason } : {}),
+          ...(timeChanged ? { reminderSentAt: null } : {}),
         },
         select: appointmentSelect,
       });
 
-      const changedLines = [
-        `Animal : ${appointment.pet?.name ?? "—"}`,
-        `Nouvelle date : ${formatDisplayDateTime(updated.scheduledStart)}`,
-        `Type : ${updated.appointmentType}`,
-      ];
+      const timeWasChanged =
+        updated.scheduledStart.getTime() !== appointment.scheduledStart.getTime() ||
+        updated.scheduledEnd.getTime() !== appointment.scheduledEnd.getTime();
 
       await notifyUser(fastify, {
         recipientId: appointment.clientId,
@@ -487,12 +509,18 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
       }).catch((err) => fastify.log.error("Notification mise à jour RDV échouée: %s", String(err)));
 
       if (appointment.client.email) {
-        await sendAppointmentEmail(fastify, {
+        await sendAppointmentEventEmail(fastify, {
+          kind: "updated",
           to: appointment.client.email,
-          subject: "Votre rendez-vous a été mis à jour",
-          heading: "Rendez-vous mis à jour",
-          lines: changedLines,
-          footer: "Aucune donnée médicale n'est transmise par e-mail.",
+          ctx: {
+            appointmentId: updated.id,
+            sequence: timeWasChanged ? 1 : 0,
+            petName: appointment.pet?.name ?? "—",
+            type: updated.appointmentType,
+            start: updated.scheduledStart,
+            end: updated.scheduledEnd,
+            previousStart: timeWasChanged ? appointment.scheduledStart : undefined,
+          },
         });
       }
 
@@ -533,6 +561,9 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
           scheduledStart: true,
           scheduledEnd: true,
           status: true,
+          appointmentType: true,
+          pet: { select: { name: true } },
+          client: { select: { email: true } },
         },
       });
 
@@ -571,6 +602,21 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
         fastify.log.error("Notification statut RDV échouée: %s", String(err));
       }
 
+      if (parsedBody.data.status === "CANCELLED" && appointment.client.email) {
+        await sendAppointmentEventEmail(fastify, {
+          kind: "cancelled",
+          to: appointment.client.email,
+          ctx: {
+            appointmentId: updatedAppointment.id,
+            sequence: 1,
+            petName: appointment.pet?.name ?? "—",
+            type: appointment.appointmentType,
+            start: appointment.scheduledStart,
+            end: appointment.scheduledEnd,
+          },
+        });
+      }
+
       return reply.send({ appointment: toAppointmentDto(updatedAppointment) });
     }
   );
@@ -591,7 +637,15 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
         id: parsedParams.data.id,
         clientId: userId,
       },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        appointmentType: true,
+        scheduledStart: true,
+        scheduledEnd: true,
+        pet: { select: { name: true } },
+        client: { select: { email: true } },
+      },
     });
 
     if (!appointment) {
@@ -603,6 +657,21 @@ export default async function appointmentsRoutes(fastify: FastifyInstance) {
       data: { status: "CANCELLED" },
       select: appointmentSelect,
     });
+
+    if (appointment.client.email) {
+      await sendAppointmentEventEmail(fastify, {
+        kind: "cancelled",
+        to: appointment.client.email,
+        ctx: {
+          appointmentId: appointment.id,
+          sequence: 1,
+          petName: appointment.pet?.name ?? "—",
+          type: appointment.appointmentType,
+          start: appointment.scheduledStart,
+          end: appointment.scheduledEnd,
+        },
+      });
+    }
 
     return reply.send({ appointment: toAppointmentDto(cancelledAppointment) });
   });

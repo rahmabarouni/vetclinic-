@@ -3,7 +3,10 @@ import { AppointmentChangeRequestStatus, AppointmentType } from "@prisma/client"
 import { z } from "zod";
 import { getPaginationParams, paginatedResponse } from "../utils/pagination";
 import { notifyUser } from "../services/notify";
-import { sendAppointmentEmail, formatDisplayDateTime } from "../services/appointment-emails";
+import {
+  formatDisplayDateTime,
+  sendAppointmentEventEmail,
+} from "../services/appointment-emails";
 import { petHasAvailabilityConflict, veterinarianHasAvailabilityConflict } from "../utils/availability";
 
 const appointmentTypeValues = ["CONSULTATION", "VACCINATION", "SURGERY", "EMERGENCY", "CHECKUP", "GROOMING", "OTHER"] as const;
@@ -205,16 +208,18 @@ export default async function appointmentChangeRequestRoutes(fastify: FastifyIns
             }).catch((err) => fastify.log.error("Notification modification RDV échouée: %s", String(err)));
 
             if (vetUser.user.email) {
-              await sendAppointmentEmail(fastify, {
+              await sendAppointmentEventEmail(fastify, {
+                kind: "updated",
                 to: vetUser.user.email,
-                subject: "Un rendez-vous a été modifié",
-                heading: "Rendez-vous modifié par le client",
-                lines: [
-                  `Animal : ${appointment.pet?.name ?? "—"}`,
-                  `Nouvelle date : ${formatDisplayDateTime(parsedBody.data.proposedStart)}`,
-                  `Type : ${proposedType}`,
-                ],
-                footer: "Le rendez-vous était en attente de confirmation : la modification a été appliquée directement.",
+                ctx: {
+                  appointmentId: appointment.id,
+                  sequence: 1,
+                  petName: appointment.pet?.name ?? "—",
+                  type: proposedType,
+                  start: parsedBody.data.proposedStart,
+                  end: parsedBody.data.proposedEnd,
+                  previousStart: appointment.scheduledStart,
+                },
               });
             }
           }
@@ -250,17 +255,16 @@ export default async function appointmentChangeRequestRoutes(fastify: FastifyIns
           }).catch((err) => fastify.log.error("Notification demande de modification échouée: %s", String(err)));
 
           if (vetUser.user.email) {
-            await sendAppointmentEmail(fastify, {
+            await sendAppointmentEventEmail(fastify, {
+              kind: "changeReceived",
               to: vetUser.user.email,
-              subject: "Nouvelle demande de modification de rendez-vous",
-              heading: "Demande de modification",
-              lines: [
-                `Animal : ${appointment.pet?.name ?? "—"}`,
-                `Date actuelle : ${formatDisplayDateTime(appointment.scheduledStart)}`,
-                `Nouvelle date proposée : ${formatDisplayDateTime(parsedBody.data.proposedStart)}`,
-                `Type : ${proposedType}`,
-              ],
-              footer: "Connectez-vous au tableau de bord pour approuver ou refuser cette demande.",
+              ctx: {
+                appointmentId: appointment.id,
+                petName: appointment.pet?.name ?? "—",
+                type: proposedType,
+                start: parsedBody.data.proposedStart,
+                end: parsedBody.data.proposedEnd,
+              },
             });
           }
         }
@@ -353,6 +357,7 @@ export default async function appointmentChangeRequestRoutes(fastify: FastifyIns
                 clientId: true,
                 veterinarianId: true,
                 status: true,
+                appointmentType: true,
                 scheduledStart: true,
                 scheduledEnd: true,
                 pet: { select: { name: true } },
@@ -399,16 +404,17 @@ export default async function appointmentChangeRequestRoutes(fastify: FastifyIns
           }).catch((err) => fastify.log.error("Notification refus modification échouée: %s", String(err)));
 
           if (appointment.client.email) {
-            await sendAppointmentEmail(fastify, {
+            await sendAppointmentEventEmail(fastify, {
+              kind: "changeRejected",
               to: appointment.client.email,
-              subject: "Votre demande de modification a été refusée",
-              heading: "Demande de modification refusée",
-              lines: [
-                `Animal : ${appointment.pet?.name ?? "—"}`,
-                `Rendez-vous maintenu le : ${formatDisplayDateTime(appointment.scheduledStart)}`,
-                ...(parsedBody.data.responseNote ? [`Motif : ${parsedBody.data.responseNote}`] : []),
-              ],
-              footer: "Vous pouvez proposer un autre créneau depuis l'application.",
+              ctx: {
+                appointmentId: appointment.id,
+                petName: appointment.pet?.name ?? "—",
+                type: appointment.appointmentType,
+                start: appointment.scheduledStart,
+                end: appointment.scheduledEnd,
+                responseNote: parsedBody.data.responseNote ?? null,
+              },
             });
           }
 
@@ -463,9 +469,16 @@ export default async function appointmentChangeRequestRoutes(fastify: FastifyIns
               scheduledStart: changeRequest.proposedStart,
               scheduledEnd: changeRequest.proposedEnd,
               appointmentType: changeRequest.proposedType,
+              reminderSentAt: null,
               ...(changeRequest.proposedReason !== null ? { reason: changeRequest.proposedReason } : {}),
             },
-            select: { id: true, scheduledStart: true, appointmentType: true, pet: { select: { name: true } } },
+            select: {
+              id: true,
+              scheduledStart: true,
+              scheduledEnd: true,
+              appointmentType: true,
+              pet: { select: { name: true } },
+            },
           }),
         ]);
 
@@ -477,16 +490,17 @@ export default async function appointmentChangeRequestRoutes(fastify: FastifyIns
         }).catch((err) => fastify.log.error("Notification approbation échouée: %s", String(err)));
 
         if (appointment.client.email) {
-          await sendAppointmentEmail(fastify, {
+          await sendAppointmentEventEmail(fastify, {
+            kind: "changeApproved",
             to: appointment.client.email,
-            subject: "Votre demande de modification a été approuvée",
-            heading: "Rendez-vous modifié",
-            lines: [
-              `Animal : ${appointment.pet?.name ?? "—"}`,
-              `Nouvelle date : ${formatDisplayDateTime(updatedAppointment.scheduledStart)}`,
-              `Type : ${updatedAppointment.appointmentType}`,
-            ],
-            footer: "Aucune donnée médicale n'est transmise par e-mail.",
+            ctx: {
+              appointmentId: updatedAppointment.id,
+              sequence: 1,
+              petName: updatedAppointment.pet?.name ?? "—",
+              type: updatedAppointment.appointmentType,
+              start: updatedAppointment.scheduledStart,
+              end: updatedAppointment.scheduledEnd,
+            },
           });
         }
 
