@@ -256,15 +256,15 @@ class ApiService {
   }
 
   Future<void> markNotificationRead(String id) async {
-    await _dio.patch('/api/v1/notifications/$id/read', data: <String, dynamic>{});
+    await _dio.patch('/api/v1/notifications/$id/read');
   }
 
   Future<void> markAllNotificationsRead() async {
-    await _dio.patch('/api/v1/notifications/read-all', data: <String, dynamic>{});
+    await _dio.patch('/api/v1/notifications/read-all');
   }
 
   Future<void> deleteNotification(String id) async {
-    await _dio.delete('/api/v1/notifications/$id', data: <String, dynamic>{});
+    await _dio.delete('/api/v1/notifications/$id');
   }
 
   Future<Map<String, dynamic>> getVeterinarians({bool availableOnly = false}) async {

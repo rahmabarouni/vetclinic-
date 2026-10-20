@@ -34,6 +34,36 @@ import searchRoutes from "./routes/search";
 export async function buildApp() {
   const fastify = Fastify({ logger: false });
 
+  // Parser JSON tolérant au corps vide.
+  //
+  // Par défaut, Fastify rejette un corps vide quand le Content-Type est
+  // application/json (FST_ERR_CTP_EMPTY_JSON_BODY). Or les clients HTTP
+  // (dont Dio côté app Flutter, qui envoie toujours l'en-tête JSON) envoient
+  // un PATCH/DELETE sans corps sur des routes sans payload (annuler un RDV,
+  // supprimer un pet, marquer une notification lue...). On accepte donc un
+  // corps vide en le représentant par `{}` :
+  // - les routes qui exigent un corps voient `{}` et leur validation
+  //   (schéma Fastify et/ou Zod) échoue toujours avec 400 sur champ manquant ;
+  // - un JSON malformé reste rejeté par JSON.parse (400 de Fastify).
+  // La validation des routes n'est donc pas affaiblie.
+  const defaultJsonParser = fastify.getDefaultJsonParser("error", "error") as (
+    request: unknown,
+    body: string,
+    done: (error: Error | null, value?: unknown) => void
+  ) => void;
+  fastify.addContentTypeParser(
+    "application/json",
+    { parseAs: "string" },
+    (request, body, done) => {
+      const raw = typeof body === "string" ? body : body.toString("utf8");
+      if (raw.trim().length === 0) {
+        done(null, {});
+        return;
+      }
+      defaultJsonParser(request, raw, done);
+    }
+  );
+
   await fastify.register(cors, { origin: true });
   await fastify.register(websocket);
   await fastify.register(swagger, {
