@@ -24,6 +24,7 @@ import wsConversationsRoutes from "./routes/ws-conversations";
 import uploadsRoutes from "./routes/uploads";
 import fcmRoutes from "./routes/fcm";
 import dashboardRoutes from "./routes/dashboard";
+import clientsRoutes from "./routes/clients";
 import passwordResetRoutes from "./routes/password-reset";
 import downloadsRoutes from "./routes/downloads";
 import activityRoutes from "./routes/activity";
@@ -76,6 +77,7 @@ export async function buildApp() {
   await fastify.register(uploadsRoutes, { prefix: "/api/v1" });
   await fastify.register(fcmRoutes, { prefix: "/api/v1" });
   await fastify.register(dashboardRoutes, { prefix: "/api/v1" });
+  await fastify.register(clientsRoutes, { prefix: "/api/v1" });
   await fastify.register(passwordResetRoutes, { prefix: "/api/v1" });
   await fastify.register(downloadsRoutes, { prefix: "/api/v1" });
   await fastify.register(activityRoutes, { prefix: "/api/v1" });

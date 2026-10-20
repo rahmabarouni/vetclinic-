@@ -18,6 +18,8 @@ export default async function dashboardRoutes(fastify: FastifyInstance) {
       cancellationStats,
       appointmentTypesLast30Days,
       unreadMessages,
+      appointmentsByStatusLast30Days,
+      appointmentsLast30Days,
     ] = await Promise.all([
       fastify.prisma.appointment.groupBy({
         by: ["status"],
@@ -78,7 +80,38 @@ export default async function dashboardRoutes(fastify: FastifyInstance) {
         }
         return fastify.prisma.message.count({ where });
       })(),
+
+      fastify.prisma.appointment.groupBy({
+        by: ["status"],
+        where: {
+          createdAt: { gte: thirtyDaysAgo },
+        },
+        _count: { id: true },
+      }),
+
+      fastify.prisma.appointment.findMany({
+        where: {
+          scheduledStart: { gte: thirtyDaysAgo },
+        },
+        select: { scheduledStart: true },
+      }),
     ]);
+
+    const perDayMap = new Map<string, number>();
+    for (let i = 0; i < 30; i += 1) {
+      const day = new Date(thirtyDaysAgo.getTime() + i * 24 * 60 * 60 * 1000);
+      perDayMap.set(day.toISOString().slice(0, 10), 0);
+    }
+    for (const appointment of appointmentsLast30Days) {
+      const key = appointment.scheduledStart.toISOString().slice(0, 10);
+      if (perDayMap.has(key)) {
+        perDayMap.set(key, (perDayMap.get(key) ?? 0) + 1);
+      }
+    }
+    const appointmentsPerDay = Array.from(perDayMap.entries()).map(([date, count]) => ({
+      date,
+      count,
+    }));
 
     const stats = {
       appointmentsToday: {
@@ -96,6 +129,10 @@ export default async function dashboardRoutes(fastify: FastifyInstance) {
       appointmentTypesLast30Days: Object.fromEntries(
         appointmentTypesLast30Days.map((t) => [t.appointmentType, t._count.id])
       ),
+      appointmentsByStatusLast30Days: Object.fromEntries(
+        appointmentsByStatusLast30Days.map((s) => [s.status, s._count.id])
+      ),
+      appointmentsPerDay,
       unreadMessages,
     };
 

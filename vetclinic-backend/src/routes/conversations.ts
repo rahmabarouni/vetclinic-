@@ -355,4 +355,33 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
 
     return reply.code(201).send({ message });
   });
+
+  fastify.patch("/conversations/:id/read", async (request, reply) => {
+    const parsedParams = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.code(400).send({ error: "Données invalides", details: parsedParams.error.flatten() });
+    }
+
+    const { userId, role } = request.user;
+    const conversation = await loadConversationOrReject(fastify, parsedParams.data.id, userId, role);
+
+    if (!conversation) {
+      return reply.code(404).send({ error: "Conversation introuvable." });
+    }
+
+    if (conversation === false) {
+      return reply.code(403).send({ error: "Accès refusé." });
+    }
+
+    const result = await fastify.prisma.message.updateMany({
+      where: {
+        conversationId: conversation.id,
+        senderId: { not: userId },
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+
+    return reply.send({ updated: result.count });
+  });
 }
