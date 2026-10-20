@@ -55,7 +55,11 @@ export default function MessagesPage() {
                 <div className="font-medium text-foreground truncate">
                   {conv.client.firstName} {conv.client.lastName}
                 </div>
-                <div className="text-sm text-muted truncate">{conv.client.email}</div>
+                <div className="text-sm text-muted truncate">
+                  {conv.lastMessage?.content
+                    ? `${conv.lastMessage.sender?.firstName ?? ''}: ${conv.lastMessage.content}`
+                    : conv.client.email}
+                </div>
               </div>
               <div className="text-right flex-shrink-0">
                 <div className="text-xs text-muted">{formatDateTime(conv.updatedAt)}</div>

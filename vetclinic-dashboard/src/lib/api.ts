@@ -127,6 +127,7 @@ export interface Conversation {
     id: string; userId: string; specialty: string | null;
     user: { id: string; email: string; firstName: string; lastName: string; role: string };
   } | null;
+  lastMessage?: Message | null;
 }
 
 export interface Message {

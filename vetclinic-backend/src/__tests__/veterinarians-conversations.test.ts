@@ -184,3 +184,37 @@ describe("POST /api/v1/conversations", () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+describe("GET /api/v1/conversations — aperçu du dernier message", () => {
+  it("expose lastMessage avec le contenu du dernier message", async () => {
+    const create = await app.inject({
+      method: "POST",
+      url: "/api/v1/conversations",
+      headers: { authorization: `Bearer ${clientToken}` },
+      payload: { veterinarianId },
+    });
+    expect([200, 201]).toContain(create.statusCode);
+    const conversationId = create.json().conversation.id;
+    createdConversationIds.push(conversationId);
+
+    const send = await app.inject({
+      method: "POST",
+      url: `/api/v1/conversations/${conversationId}/messages`,
+      headers: { authorization: `Bearer ${clientToken}` },
+      payload: { content: "apercu-du-dernier-message" },
+    });
+    expect(send.statusCode).toBe(201);
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/api/v1/conversations",
+      headers: { authorization: `Bearer ${clientToken}` },
+    });
+    expect(list.statusCode).toBe(200);
+    const found = list.json().data.find((c: any) => c.id === conversationId);
+    expect(found).toBeTruthy();
+    expect(found.lastMessage).toBeTruthy();
+    expect(found.lastMessage.content).toBe("apercu-du-dernier-message");
+    expect(found.lastMessage.sender).toBeTruthy();
+  });
+});

@@ -136,9 +136,15 @@ class _ConversationCard extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          conversation.status == 'OPEN' ? 'Ouverte' : 'Fermée',
+          conversation.lastMessage?.content?.isNotEmpty == true
+              ? conversation.lastMessage!.content!
+              : (conversation.status == 'OPEN' ? 'Ouverte' : 'Fermée'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: conversation.status == 'OPEN' ? AppColors.primary : Colors.grey,
+            color: conversation.lastMessage?.content?.isNotEmpty == true
+                ? Colors.grey.shade700
+                : (conversation.status == 'OPEN' ? AppColors.primary : Colors.grey),
             fontSize: 12,
           ),
         ),

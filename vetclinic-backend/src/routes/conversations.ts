@@ -55,6 +55,30 @@ const conversationSelect = {
       },
     },
   },
+  messages: {
+    take: 1,
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      conversationId: true,
+      senderId: true,
+      content: true,
+      attachmentUrl: true,
+      attachmentType: true,
+      isRead: true,
+      createdAt: true,
+      updatedAt: true,
+      sender: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+        },
+      },
+    },
+  },
 } as const;
 
 const messageSelect = {
@@ -137,6 +161,12 @@ async function loadConversationOrReject(fastify: FastifyInstance, conversationId
   return conversation;
 }
 
+function toConversationDto<T extends { messages?: unknown[] }>(conversation: T) {
+  const { messages, ...rest } = conversation as T & { messages?: unknown[] };
+  const lastMessage = Array.isArray(messages) && messages.length > 0 ? messages[0] : null;
+  return { ...rest, lastMessage };
+}
+
 export default async function conversationsRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
 
@@ -184,7 +214,7 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
       });
 
       if (existingConversation) {
-        return reply.send({ conversation: existingConversation });
+        return reply.send({ conversation: toConversationDto(existingConversation) });
       }
 
       const conversation = await fastify.prisma.conversation.create({
@@ -195,7 +225,7 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
         select: conversationSelect,
       });
 
-      return reply.code(201).send({ conversation });
+      return reply.code(201).send({ conversation: toConversationDto(conversation) });
     }
   );
 
@@ -210,7 +240,7 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
         fastify.prisma.conversation.findMany({ where, skip, take: limit, orderBy: { updatedAt: "desc" }, select: conversationSelect }),
         fastify.prisma.conversation.count({ where }),
       ]);
-      return reply.send(paginatedResponse(conversations, total, page, limit));
+      return reply.send(paginatedResponse(conversations.map(toConversationDto), total, page, limit));
     }
 
     if (role === "VETERINARIAN") {
@@ -223,7 +253,7 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
         fastify.prisma.conversation.findMany({ where, skip, take: limit, orderBy: { updatedAt: "desc" }, select: conversationSelect }),
         fastify.prisma.conversation.count({ where }),
       ]);
-      return reply.send(paginatedResponse(conversations, total, page, limit));
+      return reply.send(paginatedResponse(conversations.map(toConversationDto), total, page, limit));
     }
 
     const where = {};
@@ -231,7 +261,7 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
       fastify.prisma.conversation.findMany({ where, skip, take: limit, orderBy: { updatedAt: "desc" }, select: conversationSelect }),
       fastify.prisma.conversation.count({ where }),
     ]);
-    return reply.send(paginatedResponse(conversations, total, page, limit));
+    return reply.send(paginatedResponse(conversations.map(toConversationDto), total, page, limit));
   });
 
   fastify.get("/conversations/:id/messages", async (request, reply) => {
@@ -265,7 +295,7 @@ export default async function conversationsRoutes(fastify: FastifyInstance) {
       fastify.prisma.message.count({ where: { conversationId: conversation.id } }),
     ]);
 
-    return reply.send({ conversation, ...paginatedResponse(messages, msgTotal, msgPagination.page, msgPagination.limit) });
+    return reply.send({ conversation: toConversationDto(conversation), ...paginatedResponse(messages, msgTotal, msgPagination.page, msgPagination.limit) });
   });
 
   fastify.post("/conversations/:id/messages", {
