@@ -3,6 +3,12 @@ const WebSocket = require('ws');
 
 const BASE = 'http://localhost:3000';
 
+const SEED_PASSWORD = process.env.SEED_PASSWORD;
+if (!SEED_PASSWORD) {
+  console.error('SEED_PASSWORD est requis pour ce script (mot de passe des comptes de démonstration).');
+  process.exit(1);
+}
+
 function post(path, body, token) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
@@ -53,13 +59,13 @@ async function main() {
 
   // 1. Login both users
   console.log('[1] Login CLIENT...');
-  const cLogin = await post('/api/v1/auth/login', { email: 'jean.dupont@email.test', password: 'REDACTED_DEMO_PASSWORD' });
+  const cLogin = await post('/api/v1/auth/login', { email: 'jean.dupont@email.test', password: SEED_PASSWORD });
   const cToken = cLogin.token;
   const cUser = cLogin.user;
   console.log(`    OK: ${cUser.firstName} ${cUser.lastName} (id=${cUser.id})`);
 
   console.log('[2] Login VET...');
-  const vLogin = await post('/api/v1/auth/login', { email: 'dr.martin@vetclinic.test', password: 'REDACTED_DEMO_PASSWORD' });
+  const vLogin = await post('/api/v1/auth/login', { email: 'dr.martin@vetclinic.test', password: SEED_PASSWORD });
   const vToken = vLogin.token;
   const vUser = vLogin.user;
   console.log(`    OK: ${vUser.firstName} ${vUser.lastName} (id=${vUser.id})`);

@@ -3,19 +3,24 @@
 $BASE = "http://localhost:3000"
 $VET_PROFILE_ID = "ea5e9341-ffa0-46de-b4e0-17988c36f246"
 
+if (-not $env:SEED_PASSWORD) {
+  Write-Error "SEED_PASSWORD est requis pour ce script (mot de passe des comptes de démonstration)."
+  exit 1
+}
+
 Write-Output "=========================================="
 Write-Output " Phase 5 - WebSocket Chat Proof Test"
 Write-Output "=========================================="
 
 # Step 1: Login as CLIENT
 Write-Output "`n[1/6] Login CLIENT..."
-$cLogin = Invoke-RestMethod -Uri "$BASE/api/v1/auth/login" -Method POST -ContentType "application/json" -Body '{"email":"jean.dupont@email.test","password":"REDACTED_DEMO_PASSWORD"}'
+$cLogin = Invoke-RestMethod -Uri "$BASE/api/v1/auth/login" -Method POST -ContentType "application/json" -Body (@{email="jean.dupont@email.test";password=$env:SEED_PASSWORD} | ConvertTo-Json)
 $cToken = $cLogin.token; $cId = $cLogin.user.id
 Write-Output "  OK: $($cLogin.user.firstName) $($cLogin.user.lastName) id=$cId"
 
 # Step 2: Login as VET
 Write-Output "`n[2/6] Login VET..."
-$vLogin = Invoke-RestMethod -Uri "$BASE/api/v1/auth/login" -Method POST -ContentType "application/json" -Body '{"email":"dr.martin@vetclinic.test","password":"REDACTED_DEMO_PASSWORD"}'
+$vLogin = Invoke-RestMethod -Uri "$BASE/api/v1/auth/login" -Method POST -ContentType "application/json" -Body (@{email="dr.martin@vetclinic.test";password=$env:SEED_PASSWORD} | ConvertTo-Json)
 $vToken = $vLogin.token; $vId = $vLogin.user.id
 Write-Output "  OK: $($vLogin.user.firstName) $($vLogin.user.lastName) id=$vId"
 

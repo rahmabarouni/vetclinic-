@@ -2,6 +2,12 @@ const http = require('http');
 
 const NEXT_PORT = 3001;
 
+const SEED_PASSWORD = process.env.SEED_PASSWORD;
+if (!SEED_PASSWORD) {
+  console.error('SEED_PASSWORD est requis pour ce script (mot de passe des comptes de démonstration).');
+  process.exit(1);
+}
+
 function request(method, path, body, cookie) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
@@ -46,7 +52,7 @@ async function main() {
 
   const login = await request('POST', '/api/auth/login', {
     email: 'dr.martin@vetclinic.test',
-    password: 'REDACTED_DEMO_PASSWORD',
+    password: SEED_PASSWORD,
   });
   const cookie = extractTokenCookie(login.setCookie);
   console.log(`[1] Login dr.martin -> ${login.status}, cookie=${cookie ? 'YES' : 'NO'}`);
