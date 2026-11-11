@@ -33,26 +33,33 @@ npm run dev
 
 ## Comptes de test (seed)
 
-| Rôle | Email | Mot de passe |
-|---|---|---|
-| ADMIN | admin@vetclinic.test | REDACTED_DEMO_PASSWORD |
-| VÉTÉRINAIRE | dr.martin@vetclinic.test | REDACTED_DEMO_PASSWORD |
-| VÉTÉRINAIRE | dr.durand@vetclinic.test | REDACTED_DEMO_PASSWORD |
-| CLIENT | jean.dupont@email.test | REDACTED_DEMO_PASSWORD |
-| CLIENT | marie.leroy@email.test | REDACTED_DEMO_PASSWORD |
-| CLIENT | pierre.moreau@email.test | REDACTED_DEMO_PASSWORD |
+> ⚠️ Comptes de **démonstration** uniquement, destinés à une base de développement.
+> Le mot de passe n'est pas versionné : il provient de la variable
+> `SEED_PASSWORD` ; à défaut, `npm run db:seed` en génère un **aléatoire**
+> et l'affiche une seule fois. Ne réutilisez jamais ces comptes en production.
+
+| Rôle | Email |
+|---|---|
+| ADMIN | admin@vetclinic.test |
+| VÉTÉRINAIRE | dr.martin@vetclinic.test |
+| VÉTÉRINAIRE | dr.durand@vetclinic.test |
+| CLIENT | jean.dupont@email.test |
+| CLIENT | marie.leroy@email.test |
+| CLIENT | pierre.moreau@email.test |
 
 ## Variables d'environnement
 
-Voir `.env.example` pour la liste complète.
+Voir `.env.example` pour la liste complète. **Ne commitez jamais de fichier
+`.env`** : il est ignoré par git et doit contenir des valeurs propres à votre
+machine / environnement.
 
 | Variable | Description | Défaut |
 |---|---|---|
 | `DATABASE_URL` | URL PostgreSQL | `postgresql://...` |
 | `JWT_SECRET` | Secret pour les tokens JWT | (obligatoire en prod) |
 | `MINIO_ENDPOINT` | URL du serveur MinIO | `http://localhost:9000` |
-| `MINIO_ROOT_USER` | Utilisateur MinIO | `REDACTED_MINIO_USER` |
-| `MINIO_ROOT_PASSWORD` | Mot de passe MinIO | `REDACTED_MINIO_PASSWORD` |
+| `MINIO_ROOT_USER` | Utilisateur MinIO | (à définir — voir `.env.example`) |
+| `MINIO_ROOT_PASSWORD` | Mot de passe MinIO | (à définir — voir `.env.example`) |
 | `REMINDER_CRON_SCHEDULE` | Planification du cron rappels | `0 8 * * *` (8h/jour) |
 
 ## Architecture

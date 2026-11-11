@@ -37,7 +37,7 @@ Résultat : `{"status":"ok"}`
 
 **Login (obtenir le token) :**
 ```powershell
-$r = Invoke-WebRequest -Uri "http://localhost:3000/api/v1/auth/login" -Method POST -Body '{"email":"dr.martin@vetclinic.test","password":"REDACTED_DEMO_PASSWORD"}' -ContentType "application/json" -UseBasicParsing
+$r = Invoke-WebRequest -Uri "http://localhost:3000/api/v1/auth/login" -Method POST -Body '{"email":"dr.martin@vetclinic.test","password":"<mot-de-passe-demo>"}' -ContentType "application/json" -UseBasicParsing
 $r.Content
 ```
 Résultat : un JSON avec `user` et `token`. Copie le token.
@@ -95,7 +95,7 @@ Le dashboard démarre sur `http://localhost:3001`.
 1. Ouvrir `http://localhost:3001` dans le navigateur
 2. Se connecter avec :
    - Email : `dr.martin@vetclinic.test`
-   - Mot de passe : `REDACTED_DEMO_PASSWORD`
+   - Mot de passe : `<mot-de-passe-demo>`
 3. Vérifier :
    - Redirigé vers `/dashboard` (pas de token visible dans l'URL)
    - Liste des RDV affichée avec les noms des animaux et propriétaires
@@ -126,7 +126,7 @@ flutter run
 
 | Test | Comment | Résultat attendu |
 |------|---------|-----------------|
-| Login | Entrer `jean.dupont@email.test` / `REDACTED_DEMO_PASSWORD` | Redirigé vers l'écran d'accueil |
+| Login | Entrer `jean.dupont@email.test` / `<mot-de-passe-demo>` | Redirigé vers l'écran d'accueil |
 | Liste animaux | Onglet "Pets" | Voir Rex, Luna, Mimi... |
 | Détail animal | Cliquer sur un animal | Espèce, race, sexe, poids affichés |
 | Chat | Onglet "Messages" | Liste des conversations |
@@ -145,9 +145,9 @@ flutter run
 
 | Rôle | Email | Mot de passe |
 |------|-------|-------------|
-| Vétérinaire | `dr.martin@vetclinic.test` | `REDACTED_DEMO_PASSWORD` |
-| Vétérinaire | `dr.durand@vetclinic.test` | `REDACTED_DEMO_PASSWORD` |
-| Admin | `admin@vetclinic.test` | `REDACTED_DEMO_PASSWORD` |
-| Client | `jean.dupont@email.test` | `REDACTED_DEMO_PASSWORD` |
-| Client | `marie.leroy@email.test` | `REDACTED_DEMO_PASSWORD` |
-| Client | `pierre.moreau@email.test` | `REDACTED_DEMO_PASSWORD` |
+| Vétérinaire | `dr.martin@vetclinic.test` | `<mot-de-passe-demo>` |
+| Vétérinaire | `dr.durand@vetclinic.test` | `<mot-de-passe-demo>` |
+| Admin | `admin@vetclinic.test` | `<mot-de-passe-demo>` |
+| Client | `jean.dupont@email.test` | `<mot-de-passe-demo>` |
+| Client | `marie.leroy@email.test` | `<mot-de-passe-demo>` |
+| Client | `pierre.moreau@email.test` | `<mot-de-passe-demo>` |

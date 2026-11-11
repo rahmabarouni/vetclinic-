@@ -8,7 +8,7 @@ Ce guide couvre uniquement le **redémarrage** de ce qui est déjà installé �
 
 - **Base de données** : conteneur Docker `vetclinic-db`, exposé sur le port **5433** (pas 5432, à cause du conflit avec un PostgreSQL natif déjà installé sur ta machine)
 - **Backend** : dossier `C:\Users\rahma\Desktop\vetclinic\vetclinic-backend`
-- **Utilisateur DB** : `vetclinic` / mot de passe `REDACTED_DB_PASSWORD`
+- **Utilisateur DB** : `vetclinic` (mot de passe défini dans votre `.env` local, non versionné)
 
 ---
 
@@ -139,7 +139,7 @@ Tester manuellement (navigateur ou Postman) :
 
 Test	URL	Méthode	Résultat attendu
 Santé	http://localhost:3000/health	GET	{"status":"ok"}
-Login	http://localhost:3000/api/v1/auth/login	POST	Body: {"email":"dr.martin@vetclinic.test","password":"REDACTED_DEMO_PASSWORD"} → Retourne un token JWT
+Login	http://localhost:3000/api/v1/auth/login	POST	Body: {"email":"dr.martin@vetclinic.test","password":"<mot-de-passe-demo>"} → Retourne un token JWT
 Profil	http://localhost:3000/api/v1/users/profile	GET	Header: Authorization: Bearer <token> → Infos utilisateur
 RDV	http://localhost:3000/api/v1/appointments	GET	Header: Authorization: Bearer <token> → Liste des RDV
 Changer statut	http://localhost:3000/api/v1/appointments/<id>/status	PATCH	Body: {"status":"CONFIRMED"} → RDV mis à jour
@@ -158,7 +158,7 @@ Tester :
 Ouvrir http://localhost:3001 dans le navigateur
 Se connecter avec :
 Email : dr.martin@vetclinic.test
-Mot de passe : REDACTED_DEMO_PASSWORD
+Mot de passe : <mot-de-passe-demo>
 Vérifier :
 ✅ Redirigé vers /dashboard (pas de token visible dans l'URL)
 ✅ Liste des RDV affichée avec les noms des animaux et propriétaires
@@ -181,7 +181,7 @@ flutter run
 Tester sur émulateur ou téléphone :
 
 Test	Comment	Résultat attendu
-Login	Entrer jean.dupont@email.test / REDACTED_DEMO_PASSWORD	Redirigé vers l'écran d'accueil
+Login	Entrer jean.dupont@email.test / <mot-de-passe-demo>	Redirigé vers l'écran d'accueil
 Liste animaux	Onglet "Pets"	Voir Rex, Luna, Mimi...
 Détail animal	Cliquer sur un animal	Espèce, race, sexe, poids affichés
 Chat	Onglet "Messages"	Liste des conversations
@@ -194,9 +194,9 @@ Se connecter avec 2 utilisateurs différents
 Envoyer un message depuis l'un → il apparaît immédiatement sur l'autre
 Résumé des comptes de test
 Rôle	Email	Mot de passe
-Vétérinaire	dr.martin@vetclinic.test	REDACTED_DEMO_PASSWORD
-Vétérinaire	dr.durand@vetclinic.test	REDACTED_DEMO_PASSWORD
-Admin	admin@vetclinic.test	REDACTED_DEMO_PASSWORD
-Client	jean.dupont@email.test	REDACTED_DEMO_PASSWORD
-Client	marie.leroy@email.test	REDACTED_DEMO_PASSWORD
-Client	pierre.moreau@email.test	REDACTED_DEMO_PASSWORD
+Vétérinaire	dr.martin@vetclinic.test	<mot-de-passe-demo>
+Vétérinaire	dr.durand@vetclinic.test	<mot-de-passe-demo>
+Admin	admin@vetclinic.test	<mot-de-passe-demo>
+Client	jean.dupont@email.test	<mot-de-passe-demo>
+Client	marie.leroy@email.test	<mot-de-passe-demo>
+Client	pierre.moreau@email.test	<mot-de-passe-demo>
