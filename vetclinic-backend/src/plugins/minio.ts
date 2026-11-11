@@ -30,9 +30,20 @@ async function ensureBucket(s3: S3Client, bucket: string): Promise<void> {
   try {
     await s3.send(new HeadBucketCommand({ Bucket: bucket }));
   } catch (err: any) {
+    const code = err.name || err.Code;
+    if (code === "BucketAlreadyOwnedByYou" || code === "BucketAlreadyExists") {
+      return;
+    }
     if (err.name === "NotFound" || err.$metadata?.httpStatusCode === 404) {
       const { CreateBucketCommand } = await import("@aws-sdk/client-s3");
-      await s3.send(new CreateBucketCommand({ Bucket: bucket }));
+      try {
+        await s3.send(new CreateBucketCommand({ Bucket: bucket }));
+      } catch (createErr: any) {
+        const createCode = createErr.name || createErr.Code;
+        if (createCode !== "BucketAlreadyOwnedByYou" && createCode !== "BucketAlreadyExists") {
+          throw createErr;
+        }
+      }
     } else {
       console.warn("[MinIO] Impossible de vérifier/créer le bucket:", err.message || err);
     }
