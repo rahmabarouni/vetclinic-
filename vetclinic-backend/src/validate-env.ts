@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 const isProduction = process.env.NODE_ENV === "production";
 
 const requiredInProduction = [
@@ -17,18 +19,42 @@ if (isProduction && missing.length > 0) {
 
 if (!isProduction && missing.length > 0) {
   for (const s of missing) {
-    console.warn(`⚠️  [DEV] ${s.name} non défini — fallback utilisé. Ne pas déployer en production sans cette variable.`);
+    console.warn(`⚠️  [DEV] ${s.name} non défini — valeur éphémère utilisée. Ne pas déployer en production sans cette variable.`);
   }
 }
 
+/**
+ * Valeurs éphémères générées en dev/test lorsque la variable est absente.
+ * Aucun identifiant n'est codé en dur dans le dépôt.
+ */
+const ephemeralValues = new Map<string, string>();
+
+function readSecret(name: string): string {
+  const value = process.env[name]?.trim();
+  if (value) {
+    return value;
+  }
+
+  if (isProduction) {
+    throw new Error(`${name} est requis en production.`);
+  }
+
+  let generated = ephemeralValues.get(name);
+  if (!generated) {
+    generated = randomBytes(24).toString("hex");
+    ephemeralValues.set(name, generated);
+  }
+  return generated;
+}
+
 export function getJwtSecret(): string {
-  return process.env.JWT_SECRET || "REDACTED_DEV_SECRET";
+  return readSecret("JWT_SECRET");
 }
 
 export function getMinioUser(): string {
-  return process.env.MINIO_ROOT_USER || "REDACTED_MINIO_USER";
+  return readSecret("MINIO_ROOT_USER");
 }
 
 export function getMinioPassword(): string {
-  return process.env.MINIO_ROOT_PASSWORD || "REDACTED_MINIO_PASSWORD";
+  return readSecret("MINIO_ROOT_PASSWORD");
 }

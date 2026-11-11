@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { PrismaClient, UserRole, AppointmentStatus, MedicalRecordType, ReminderType } from "@prisma/client";
 import bcrypt from "bcrypt";
 
@@ -20,6 +21,7 @@ function printRecap(
   client1: { email: string },
   client2: { email: string },
   client3: { email: string },
+  password: string,
 ) {
   console.log("\n╔══════════════════════════════════════════════════════════╗");
   console.log("║           SEED VETCLINIC — COMPTES CRÉÉS               ║");
@@ -27,12 +29,12 @@ function printRecap(
   console.log("║                                                        ║");
   console.log("║  RÔLE          EMAIL                          MDP       ║");
   console.log("║  ─────         ─────                          ───       ║");
-  console.log(`║  ADMIN         ${admin.email.padEnd(30)} REDACTED_DEMO_PASSWORD ║`);
-  console.log(`║  VÉTÉRINAIRE   ${vet1User.email.padEnd(30)} REDACTED_DEMO_PASSWORD ║`);
-  console.log(`║  VÉTÉRINAIRE   ${vet2User.email.padEnd(30)} REDACTED_DEMO_PASSWORD ║`);
-  console.log(`║  CLIENT        ${client1.email.padEnd(30)} REDACTED_DEMO_PASSWORD ║`);
-  console.log(`║  CLIENT        ${client2.email.padEnd(30)} REDACTED_DEMO_PASSWORD ║`);
-  console.log(`║  CLIENT        ${client3.email.padEnd(30)} REDACTED_DEMO_PASSWORD ║`);
+  console.log(`║  ADMIN         ${admin.email.padEnd(30)} ${password} ║`);
+  console.log(`║  VÉTÉRINAIRE   ${vet1User.email.padEnd(30)} ${password} ║`);
+  console.log(`║  VÉTÉRINAIRE   ${vet2User.email.padEnd(30)} ${password} ║`);
+  console.log(`║  CLIENT        ${client1.email.padEnd(30)} ${password} ║`);
+  console.log(`║  CLIENT        ${client2.email.padEnd(30)} ${password} ║`);
+  console.log(`║  CLIENT        ${client3.email.padEnd(30)} ${password} ║`);
   console.log("║                                                        ║");
   console.log("╠══════════════════════════════════════════════════════════╣");
   console.log("║  ANIMAUX : Rex (chien), Mimi (chat), Tweety (oiseau),   ║");
@@ -46,7 +48,18 @@ function printRecap(
 }
 
 async function main() {
-  const passwordHash = await bcrypt.hash("REDACTED_DEMO_PASSWORD", 12);
+  const seedPassword = process.env.SEED_PASSWORD?.trim();
+  const generatedPassword = !seedPassword;
+  if (process.env.NODE_ENV === "production" && generatedPassword) {
+    throw new Error(
+      "SEED_PASSWORD est requis pour exécuter le seed en production (aucun mot de passe par défaut n'est fourni).",
+    );
+  }
+  // Aucun mot de passe de démonstration n'est stocké dans le dépôt :
+  // soit SEED_PASSWORD est fourni, soit un mot de passe aléatoire est généré
+  // et affiché une seule fois à la fin du seed.
+  const demoPassword = seedPassword || randomBytes(9).toString("base64url");
+  const passwordHash = await bcrypt.hash(demoPassword, 12);
 
   // ─── USERS (idempotent via upsert on email) ───
   const admin = await prisma.user.upsert({
@@ -177,7 +190,7 @@ async function main() {
 
   if (!pet1) {
     console.log("Les animaux existent déjà — seed appointments/medical records ignoré.");
-    printRecap(admin, vet1User, vet2User, client1, client2, client3);
+    printRecap(admin, vet1User, vet2User, client1, client2, client3, demoPassword);
     return;
   }
 
@@ -185,7 +198,7 @@ async function main() {
   const existingAppointments = await prisma.appointment.count();
   if (existingAppointments > 0) {
     console.log("Les appointments existent déjà — seed appointments ignoré.");
-    printRecap(admin, vet1User, vet2User, client1, client2, client3);
+    printRecap(admin, vet1User, vet2User, client1, client2, client3, demoPassword);
     return;
   }
 
@@ -307,7 +320,12 @@ async function main() {
     },
   });
 
-  printRecap(admin, vet1User, vet2User, client1, client2, client3);
+  printRecap(admin, vet1User, vet2User, client1, client2, client3, demoPassword);
+
+  if (generatedPassword) {
+    console.log("ℹ️  Mot de passe généré aléatoirement pour cette exécution (non stocké).");
+    console.log("   Définissez SEED_PASSWORD pour imposer un mot de passe de démonstration.\n");
+  }
 }
 
 main()
