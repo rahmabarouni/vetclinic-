@@ -28,7 +28,7 @@ void main() {
   });
 
   test('l image de couverture du login est chargeable', () async {
-    final data = await rootBundle.load('assets/images/login_cover.png');
+    final data = await rootBundle.load('assets/images/login_cover.webp');
     expect(data.lengthInBytes, greaterThan(0));
   });
 }
