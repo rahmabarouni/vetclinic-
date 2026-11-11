@@ -68,7 +68,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.pets, size: 80, color: AppColors.primary),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Image.asset(
+                    'assets/images/login_cover.png',
+                    width: 220,
+                    fit: BoxFit.contain,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'VetClinic',

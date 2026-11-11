@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/pet.dart';
 import '../providers/pets_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/pet_species_image.dart';
 import 'pet_detail_screen.dart';
 import 'pet_form_screen.dart';
 
@@ -98,21 +99,6 @@ class _PetCard extends StatelessWidget {
   final VoidCallback onTap;
   const _PetCard({required this.pet, required this.onTap});
 
-  IconData _speciesIcon(String species) {
-    switch (species) {
-      case 'DOG':
-        return Icons.pets;
-      case 'CAT':
-        return Icons.pets;
-      case 'BIRD':
-        return Icons.egg;
-      case 'RABBIT':
-        return Icons.pets;
-      default:
-        return Icons.pets;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -121,7 +107,7 @@ class _PetCard extends StatelessWidget {
         onTap: onTap,
         leading: CircleAvatar(
           backgroundColor: AppColors.primaryLight,
-          child: Icon(_speciesIcon(pet.species), color: AppColors.primary),
+          child: PetSpeciesImage(species: pet.species, size: 32),
         ),
         title: Text(pet.name, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(

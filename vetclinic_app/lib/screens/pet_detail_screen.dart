@@ -6,6 +6,7 @@ import '../models/pet_document.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_utils.dart';
+import '../widgets/pet_species_image.dart';
 
 class PetDetailScreen extends ConsumerStatefulWidget {
   final Pet pet;
@@ -131,15 +132,6 @@ class _PetBanner extends StatelessWidget {
   final Pet pet;
   const _PetBanner({required this.pet});
 
-  IconData get _speciesIcon {
-    switch (pet.species) {
-      case 'BIRD':
-        return Icons.egg;
-      default:
-        return Icons.pets;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -164,14 +156,14 @@ class _PetBanner extends StatelessWidget {
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => CircleAvatar(
                       radius: 40,
-                      backgroundColor: Colors.white24,
-                      child: Icon(_speciesIcon, color: Colors.white, size: 40),
+                      backgroundColor: Colors.white,
+                      child: PetSpeciesImage(species: pet.species, size: 56),
                     ),
                   )
                 : CircleAvatar(
                     radius: 40,
-                    backgroundColor: Colors.white24,
-                    child: Icon(_speciesIcon, color: Colors.white, size: 40),
+                    backgroundColor: Colors.white,
+                    child: PetSpeciesImage(species: pet.species, size: 56),
                   ),
           ),
           const SizedBox(height: 12),
@@ -228,7 +220,7 @@ class _InfoTab extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.pets, color: AppColors.primary),
+                    PetSpeciesImage(species: pet.species, size: 24),
                     const SizedBox(width: 8),
                     Text(
                       pet.name,

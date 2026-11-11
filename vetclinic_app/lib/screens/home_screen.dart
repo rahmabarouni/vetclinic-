@@ -8,6 +8,7 @@ import '../providers/notifications_provider.dart';
 import '../providers/pets_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_utils.dart';
+import '../widgets/pet_species_image.dart';
 import 'appointment_form_screen.dart';
 import 'notifications_screen.dart';
 import 'pet_detail_screen.dart';
@@ -371,7 +372,7 @@ class _PetMiniCard extends StatelessWidget {
             CircleAvatar(
               radius: 22,
               backgroundColor: AppColors.primaryLight,
-              child: const Icon(Icons.pets, color: AppColors.primary),
+              child: PetSpeciesImage(species: pet.species, size: 34),
             ),
             const SizedBox(height: 8),
             Text(
