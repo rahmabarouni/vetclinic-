@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
@@ -32,6 +33,15 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md bg-white rounded-lg shadow-md p-8">
         <div className="text-center mb-8">
+          <Image
+            src="/login_cover.webp"
+            alt="Illustration VetClinic"
+            width={800}
+            height={669}
+            priority
+            unoptimized
+            className="mx-auto mb-4 w-44 h-auto"
+          />
           <h1 className="text-2xl font-bold text-gray-900">VetClinic Dashboard</h1>
           <p className="text-gray-500 mt-1">Connexion vétérinaire / staff</p>
         </div>
