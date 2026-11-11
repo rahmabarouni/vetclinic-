@@ -5,12 +5,19 @@ node_modules/
 dist/
 *.js.map
 
-# Environment
+# Environment / secrets (ne jamais commiter)
 .env
-.env.local
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Secrets / Firebase service accounts
 *firebase-adminsdk*.json
+*service-account*.json
 
 # Logs
 *.log

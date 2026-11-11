@@ -1,25 +1,108 @@
-# Dependencies
-node_modules/
-
-# Environment files
+# =====================================================================
+#  SÉCURITÉ — NE JAMAIS COMMITER DE SECRET
+#  Les fichiers ci-dessous peuvent contenir des identifiants :
+#  ils doivent rester locaux (non versionnés).
+# =====================================================================
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.*.example
 
-# Build output
+# Clés et certificats
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.ovpn
+*.crt
+
+# Comptes de service / identifiants cloud
+secrets/
+secret/
+credentials/
+credentials*.json
+*service-account*.json
+*serviceAccount*.json
+*firebase-adminsdk*.json
+.gcp/
+.aws/
+.azure/
+.npmrc
+.pypirc
+netrc
+_netrc
+
+# Firebase / Google Services (contiennent des clés API)
+google-services.json
+GoogleService-Info.plist
+.firebaserc
+**/google-services.json
+**/GoogleService-Info.plist
+!**/google-services.json.example
+
+# Android : signature de release
+**/key.properties
+**/local.properties
+
+# =====================================================================
+#  DÉPENDANCES
+# =====================================================================
+node_modules/
+.pnp
+.pnp.*
+.yarn/cache
+.yarn/unplugged
+
+# =====================================================================
+#  BUILD / ARTEFACTS
+# =====================================================================
 dist/
 build/
+out/
+.next/
+coverage/
+*.tsbuildinfo
+*.js.map
+next-env.d.ts
 
-# Logs
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+**/ios/Flutter/.last_build_id
+ios/Pods/
+macos/Pods/
+
+# =====================================================================
+#  LOGS ET FICHIERS TEMPORAIRES
+# =====================================================================
+logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.bak
+*.tmp
+*.orig
+*.rej
 
-# OS files
+# =====================================================================
+#  OS
+# =====================================================================
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# IDE
+# =====================================================================
+#  IDE / ÉDITEURS
+# =====================================================================
 .idea/
 .vscode/
 *.swp
 *.swo
+*.iml
