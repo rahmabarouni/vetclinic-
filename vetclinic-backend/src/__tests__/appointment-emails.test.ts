@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { getApp, closeApp, deleteTestEntities, prisma } from "./helper";
+import { getApp, closeApp, deleteTestEntities, prisma, getAdminToken } from "./helper";
 import {
   clearSentEmails,
   sentEmails,
@@ -85,13 +85,7 @@ beforeAll(async () => {
   petId = petRes.json().pet.id;
   createdPetIds.push(petId);
 
-  const adminLogin = await app.inject({
-    method: "POST",
-    url: "/api/v1/auth/login",
-    remoteAddress: "127.0.0.212",
-    payload: { email: "admin@vetclinic.test", password: "REDACTED_DEMO_PASSWORD" },
-  });
-  adminToken = adminLogin.json().token;
+  adminToken = await getAdminToken(app);
 
   const vetEmail = `p2-vet-${Date.now()}@test.com`;
   createdEmails.push(vetEmail);

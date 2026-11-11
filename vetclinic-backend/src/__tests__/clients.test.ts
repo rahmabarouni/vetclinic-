@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getApp, closeApp, deleteTestEntities } from "./helper";
+import { getApp, closeApp, deleteTestEntities, getAdminToken } from "./helper";
 
 let app: any;
 let adminToken: string;
@@ -16,14 +16,7 @@ const createdVeterinarianIds: string[] = [];
 beforeAll(async () => {
   app = await getApp();
 
-  const adminLogin = await app.inject({
-    method: "POST",
-    url: "/api/v1/auth/login",
-    remoteAddress: "127.0.0.248",
-    payload: { email: "admin@vetclinic.test", password: "REDACTED_DEMO_PASSWORD" },
-  });
-  expect(adminLogin.statusCode).toBe(200);
-  adminToken = adminLogin.json().token;
+  adminToken = await getAdminToken(app);
 
   const clientEmail = `clients-test-${Date.now()}@test.com`;
   createdEmails.push(clientEmail);
@@ -152,13 +145,7 @@ describe("Mark conversation as read", () => {
     conversationId = convRes.json().conversation.id;
     createdConversationIds.push(conversationId);
 
-    const vetLogin = await app.inject({
-      method: "POST",
-      url: "/api/v1/auth/login",
-      remoteAddress: "127.0.0.248",
-      payload: { email: "admin@vetclinic.test", password: "REDACTED_DEMO_PASSWORD" },
-    });
-    const vetToken = vetLogin.json().token;
+    const vetToken = adminToken;
 
     const msg = await app.inject({
       method: "POST",

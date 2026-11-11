@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getApp, closeApp, deleteTestEntities, prisma } from "./helper";
+import { getApp, closeApp, deleteTestEntities, prisma, getAdminToken } from "./helper";
 
 let app: any;
 let clientToken: string;
@@ -97,14 +97,7 @@ beforeAll(async () => {
   petId = petRes.json().pet.id;
   createdPetIds.push(petId);
 
-  const adminLogin = await app.inject({
-    method: "POST",
-    url: "/api/v1/auth/login",
-    remoteAddress: "127.0.0.202",
-    payload: { email: "admin@vetclinic.test", password: "REDACTED_DEMO_PASSWORD" },
-  });
-  expect(adminLogin.statusCode).toBe(200);
-  adminToken = adminLogin.json().token;
+  adminToken = await getAdminToken(app);
 
   const vetEmail = `cr-vet-${Date.now()}@test.com`;
   createdEmails.push(vetEmail);

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getApp, closeApp, deleteTestEntities } from "./helper";
+import { getApp, closeApp, deleteTestEntities, getAdminToken } from "./helper";
 
 let app: any;
 let clientToken: string;
@@ -46,14 +46,7 @@ beforeAll(async () => {
   // est partagée entre tous les fichiers de test : laisser la suite dépendre
   // d'un vétérinaire existant rendrait ce test vulnérable aux données des
   // autres runs).
-  const adminLogin = await app.inject({
-    method: "POST",
-    url: "/api/v1/auth/login",
-    remoteAddress: "127.0.0.250",
-    payload: { email: "admin@vetclinic.test", password: "REDACTED_DEMO_PASSWORD" },
-  });
-  expect(adminLogin.statusCode).toBe(200);
-  const adminToken = adminLogin.json().token;
+  const adminToken = await getAdminToken(app);
 
   const vetEmail = `appt-vet-${Date.now()}@test.com`;
   createdEmails.push(vetEmail);

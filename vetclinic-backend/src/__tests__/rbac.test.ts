@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getApp, closeApp, deleteTestEntities } from "./helper";
+import { getApp, closeApp, deleteTestEntities, getAdminToken } from "./helper";
 
 let app: any;
 let clientToken: string;
@@ -25,12 +25,7 @@ beforeAll(async () => {
   clientToken = clientLogin.json().token;
 
   // Login as admin
-  const adminLogin = await app.inject({
-    method: "POST",
-    url: "/api/v1/auth/login",
-    payload: { email: "admin@vetclinic.test", password: "REDACTED_DEMO_PASSWORD" },
-  });
-  adminToken = adminLogin.json().token;
+  adminToken = await getAdminToken(app);
 });
 
 afterAll(async () => {

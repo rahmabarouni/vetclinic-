@@ -1,5 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcrypt";
+import { randomBytes } from "node:crypto";
 import { buildApp } from "../app";
 
 const prisma = new PrismaClient();
@@ -7,6 +9,44 @@ const prisma = new PrismaClient();
 let app: FastifyInstance;
 
 export { prisma };
+
+const SUITE_ADMIN_EMAIL = "suite-admin@test.com";
+
+/**
+ * Fournit un token ADMIN pour les tests, sans dépendre d'un mot de passe
+ * versionné ni des données de seed. Un compte de test dédié est créé/mis à
+ * jour avec un mot de passe aléatoire propre à l'exécution.
+ */
+export async function getAdminToken(app: FastifyInstance): Promise<string> {
+  const password = randomBytes(18).toString("base64url");
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  await prisma.user.upsert({
+    where: { email: SUITE_ADMIN_EMAIL },
+    update: { passwordHash, role: "ADMIN", isActive: true },
+    create: {
+      email: SUITE_ADMIN_EMAIL,
+      passwordHash,
+      firstName: "Suite",
+      lastName: "Admin",
+      role: "ADMIN",
+      isActive: true,
+      emailVerified: true,
+    },
+  });
+
+  const login = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/login",
+    payload: { email: SUITE_ADMIN_EMAIL, password },
+  });
+
+  if (login.statusCode !== 200) {
+    throw new Error(`Impossible d'obtenir un token ADMIN de test (HTTP ${login.statusCode}).`);
+  }
+
+  return login.json().token;
+}
 
 export async function getApp(): Promise<FastifyInstance> {
   if (!app) {
