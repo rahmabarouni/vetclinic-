@@ -80,7 +80,7 @@ Appointment appointmentWithPendingRequest({required String clientId}) {
   );
 }
 
-Widget buildScreen({
+Widget _buildScreen({
   required _FakeApiService api,
   required String userId,
   required String appointmentClientId,
@@ -114,7 +114,7 @@ void main() {
     final api = _FakeApiService();
 
     await tester.pumpWidget(
-      buildScreen(api: api, userId: 'client-1', appointmentClientId: 'client-1'),
+      _buildScreen(api: api, userId: 'client-1', appointmentClientId: 'client-1'),
     );
     await tester.pumpAndSettle();
 
@@ -138,7 +138,7 @@ void main() {
     final api = _FakeApiService();
 
     await tester.pumpWidget(
-      buildScreen(api: api, userId: 'client-1', appointmentClientId: 'client-2'),
+      _buildScreen(api: api, userId: 'client-1', appointmentClientId: 'client-2'),
     );
     await tester.pumpAndSettle();
 

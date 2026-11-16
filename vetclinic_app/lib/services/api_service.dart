@@ -217,6 +217,14 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> updateAppointmentStatus(String id, String status) async {
+    final response = await _dio.patch(
+      '/api/v1/appointments/$id/status',
+      data: {'status': status},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> createChangeRequest(
     String appointmentId, {
     required DateTime proposedStart,

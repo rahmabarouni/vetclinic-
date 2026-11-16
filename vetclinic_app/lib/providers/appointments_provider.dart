@@ -153,18 +153,32 @@ class AppointmentsNotifier extends StateNotifier<AppointmentsState> {
     }
   }
 
-  Future<bool> cancelAppointment(String id) async {
+  /// Annule un rendez-vous.
+  /// Un client supprime son propre RDV (`DELETE`), le personnel le passe en
+  /// `CANCELLED` via `PATCH /status` (le `DELETE` leur est interdit).
+  /// Retourne `null` en cas de succès, sinon un message d'erreur.
+  /// En cas d'échec la liste courante est conservée (pas d'écran d'erreur).
+  Future<String?> cancelAppointment(String id, {required String role}) async {
+    final isStaff = role == 'VETERINARIAN' || role == 'ADMIN' || role == 'STAFF';
     try {
-      await _api.cancelAppointment(id);
-      await loadAppointments(page: state.page);
-      return true;
-    } catch (e) {
-      String message = "Erreur lors de l'annulation";
-      if (e.toString().contains('403')) {
-        message = "Accès refusé";
+      if (isStaff) {
+        await _api.updateAppointmentStatus(id, 'CANCELLED');
+      } else {
+        await _api.cancelAppointment(id);
       }
-      state = state.copyWith(status: AppointmentsStatus.error, error: message);
-      return false;
+      await loadAppointments(page: state.page);
+      return null;
+    } catch (e) {
+      if (e.toString().contains('403')) {
+        return 'Accès refusé';
+      }
+      if (e.toString().contains('404')) {
+        return 'Rendez-vous introuvable';
+      }
+      if (e.toString().contains('409')) {
+        return 'Ce rendez-vous ne peut plus être annulé';
+      }
+      return "Erreur lors de l'annulation";
     }
   }
 

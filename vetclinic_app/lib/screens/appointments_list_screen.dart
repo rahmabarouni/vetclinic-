@@ -164,24 +164,41 @@ class _AppointmentsListScreenState extends ConsumerState<AppointmentsListScreen>
     );
   }
 
-  void _confirmCancel(Appointment appointment) {
-    showDialog(
+  Future<void> _confirmCancel(Appointment appointment) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Annuler le rendez-vous'),
         content: Text('Voulez-vous annuler le rendez-vous du ${du.formatDate(appointment.scheduledStart)} ?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Non')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
           TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ref.read(appointmentsProvider.notifier).cancelAppointment(appointment.id);
-            },
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Oui', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+
+    final role = ref.read(authProvider).user?.role ?? 'CLIENT';
+    final error = await ref
+        .read(appointmentsProvider.notifier)
+        .cancelAppointment(appointment.id, role: role);
+    if (!mounted) return;
+
+    if (error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Rendez-vous annulé'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: AppColors.error),
+      );
+    }
   }
 }
 
