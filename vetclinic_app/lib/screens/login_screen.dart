@@ -34,16 +34,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  /// ID client OAuth « Web » du projet Firebase.
+  ///
+  /// Fourni au build : `flutter build apk --dart-define=GOOGLE_SERVER_CLIENT_ID=xxxx.apps.googleusercontent.com`.
+  /// Nécessaire sur Android pour obtenir un `idToken` vérifiable par le backend.
+  static const String _googleServerClientId =
+      String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+
+  void _showAuthMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
+    );
+  }
+
   Future<void> _handleGoogleSignIn() async {
     try {
       final gsi = GoogleSignIn.instance;
-      await gsi.initialize();
+      await gsi.initialize(
+        serverClientId:
+            _googleServerClientId.isEmpty ? null : _googleServerClientId,
+      );
+
       final googleUser = await gsi.authenticate();
       final idToken = googleUser.authentication.idToken;
-      if (idToken == null) return;
+      if (idToken == null) {
+        _showAuthMessage(
+          'Google Sign-In : aucun jeton reçu. Vérifiez la configuration OAuth (ID client Web).',
+        );
+        return;
+      }
       await ref.read(authProvider.notifier).loginWithGoogle(idToken: idToken);
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) return;
+      debugPrint('Google Sign-In échoué: ${e.code} ${e.description ?? ''}');
+      _showAuthMessage('Google Sign-In indisponible : ${e.description ?? e.code.name}');
     } catch (e) {
-      // Les erreurs sont affichées via le listener sur authProvider.
+      debugPrint('Google Sign-In erreur: $e');
+      _showAuthMessage('Google Sign-In indisponible : $e');
     }
   }
 
