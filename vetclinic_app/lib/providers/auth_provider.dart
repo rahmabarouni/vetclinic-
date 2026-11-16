@@ -41,10 +41,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _checkAuth() async {
     final token = await _api.token;
-    if (token != null) {
-      state = state.copyWith(status: AuthStatus.authenticated);
-    } else {
+    if (token == null) {
       state = state.copyWith(status: AuthStatus.unauthenticated);
+      return;
+    }
+
+    // Restaure l'utilisateur courant (nom, rôle) pour les écrans qui en
+    // dépendent, notamment l'affichage de l'interlocuteur dans le chat.
+    try {
+      final data = await _api.getProfile();
+      final user = User.fromJson(data['user'] as Map<String, dynamic>);
+      state = state.copyWith(status: AuthStatus.authenticated, user: user);
+    } catch (e) {
+      // 401 = jeton invalide ; 404 = utilisateur supprimé (base réinitialisée).
+      // Dans les deux cas le jeton ne sert plus à rien : on repart déconnecté.
+      final message = e.toString();
+      if (message.contains('401') || message.contains('404')) {
+        await _api.clearToken();
+        state = AuthState(status: AuthStatus.unauthenticated);
+      } else {
+        state = state.copyWith(status: AuthStatus.authenticated);
+      }
     }
   }
 
