@@ -274,6 +274,60 @@ export default async function appointmentChangeRequestRoutes(fastify: FastifyIns
     }
   );
 
+  fastify.delete(
+    "/change-requests/:id",
+    { preHandler: [fastify.authorize(["CLIENT"])] },
+    async (request, reply) => {
+      const parsedParams = z.object({ id: z.string().uuid() }).safeParse(request.params);
+      if (!parsedParams.success) {
+        return reply.code(400).send({ error: "Données invalides", details: parsedParams.error.flatten() });
+      }
+
+      const { userId } = request.user;
+
+      const changeRequest = await fastify.prisma.appointmentChangeRequest.findUnique({
+        where: { id: parsedParams.data.id },
+        select: {
+          id: true,
+          status: true,
+          proposedStart: true,
+          appointment: {
+            select: {
+              id: true,
+              clientId: true,
+              pet: { select: { name: true } },
+              veterinarian: { select: { user: { select: { id: true } } } },
+            },
+          },
+        },
+      });
+
+      if (!changeRequest || changeRequest.appointment.clientId !== userId) {
+        return reply.code(404).send({ error: "Demande de modification introuvable." });
+      }
+
+      if (changeRequest.status !== "PENDING") {
+        return reply.code(409).send({ error: "Cette demande a déjà été traitée." });
+      }
+
+      await fastify.prisma.appointmentChangeRequest.delete({ where: { id: changeRequest.id } });
+
+      const vetUserId = changeRequest.appointment.veterinarian?.user?.id;
+      if (vetUserId) {
+        await notifyUser(fastify, {
+          recipientId: vetUserId,
+          type: "APPOINTMENT",
+          title: "Demande de modification annulée",
+          body: `${changeRequest.appointment.pet?.name ?? "RDV"} — ${formatDisplayDateTime(changeRequest.proposedStart)}`,
+        }).catch((err) =>
+          fastify.log.error("Notification annulation demande de modification échouée: %s", String(err))
+        );
+      }
+
+      return reply.code(204).send();
+    }
+  );
+
   fastify.get("/change-requests", async (request, reply) => {
     const { userId, role } = request.user;
     const query = request.query as { page?: string; limit?: string; status?: string };

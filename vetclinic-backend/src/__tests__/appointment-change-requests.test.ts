@@ -352,6 +352,112 @@ describe("Demande de modification par le client", () => {
     expect(unchanged!.scheduledStart.toISOString()).toBe(slot(70).start);
   });
 
+  it("DELETE /change-requests/:id — le client annule sa demande PENDING", async () => {
+    const created = await createAppointmentFor(adminToken, ...Object.values(slot(200)) as [string, string], {
+      veterinarianId,
+    });
+    expect(created.statusCode).toBe(201);
+    const appointmentId = created.json().appointment.id;
+    createdAppointmentIds.push(appointmentId);
+
+    const proposed = slot(205);
+    const crRes = await app.inject({
+      method: "POST",
+      url: `/api/v1/appointments/${appointmentId}/change-requests`,
+      headers: { authorization: `Bearer ${clientToken}` },
+      payload: { proposedStart: proposed.start, proposedEnd: proposed.end },
+    });
+    expect(crRes.statusCode).toBe(201);
+    const crId = crRes.json().changeRequest.id;
+
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/change-requests/${crId}`,
+      headers: { authorization: `Bearer ${clientToken}` },
+    });
+
+    expect(res.statusCode).toBe(204);
+
+    const gone = await prisma.appointmentChangeRequest.findUnique({ where: { id: crId } });
+    expect(gone).toBeNull();
+
+    const unchanged = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+    expect(unchanged!.scheduledStart.toISOString()).toBe(slot(200).start);
+
+    const notification = await prisma.notification.findFirst({
+      where: { recipientId: vetUserId, title: "Demande de modification annulée" },
+      select: { id: true },
+    });
+    expect(notification).not.toBeNull();
+  });
+
+  it("DELETE /change-requests/:id — 404 pour un autre client, 403 pour un vétérinaire", async () => {
+    const created = await createAppointmentFor(adminToken, ...Object.values(slot(210)) as [string, string], {
+      veterinarianId,
+    });
+    expect(created.statusCode).toBe(201);
+    createdAppointmentIds.push(created.json().appointment.id);
+
+    const proposed = slot(215);
+    const crRes = await app.inject({
+      method: "POST",
+      url: `/api/v1/appointments/${created.json().appointment.id}/change-requests`,
+      headers: { authorization: `Bearer ${clientToken}` },
+      payload: { proposedStart: proposed.start, proposedEnd: proposed.end },
+    });
+    expect(crRes.statusCode).toBe(201);
+    const crId = crRes.json().changeRequest.id;
+
+    const otherRes = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/change-requests/${crId}`,
+      headers: { authorization: `Bearer ${otherClientToken}` },
+    });
+    expect(otherRes.statusCode).toBe(404);
+
+    const vetRes = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/change-requests/${crId}`,
+      headers: { authorization: `Bearer ${vetToken}` },
+    });
+    expect(vetRes.statusCode).toBe(403);
+
+    const stillThere = await prisma.appointmentChangeRequest.findUnique({ where: { id: crId } });
+    expect(stillThere!.status).toBe("PENDING");
+  });
+
+  it("DELETE /change-requests/:id — 409 si la demande a déjà été traitée", async () => {
+    const created = await createAppointmentFor(adminToken, ...Object.values(slot(220)) as [string, string], {
+      veterinarianId,
+    });
+    expect(created.statusCode).toBe(201);
+    createdAppointmentIds.push(created.json().appointment.id);
+
+    const proposed = slot(225);
+    const crRes = await app.inject({
+      method: "POST",
+      url: `/api/v1/appointments/${created.json().appointment.id}/change-requests`,
+      headers: { authorization: `Bearer ${clientToken}` },
+      payload: { proposedStart: proposed.start, proposedEnd: proposed.end },
+    });
+    expect(crRes.statusCode).toBe(201);
+    const crId = crRes.json().changeRequest.id;
+
+    await app.inject({
+      method: "PATCH",
+      url: `/api/v1/change-requests/${crId}/approve`,
+      headers: { authorization: `Bearer ${vetToken}` },
+    });
+
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/change-requests/${crId}`,
+      headers: { authorization: `Bearer ${clientToken}` },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatch(/déjà été traitée/);
+  });
+
   it("PATCH /change-requests/:id/approve — 409 si le créneau est devenu occupé", async () => {
     const created = await createAppointmentFor(adminToken, ...Object.values(slot(90)) as [string, string], {
       veterinarianId,
