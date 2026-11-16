@@ -43,14 +43,19 @@ class Conversation {
     );
   }
 
-  String get displayName {
-    if (veterinarian?.user != null) {
-      return '${veterinarian!.user!.firstName} ${veterinarian!.user!.lastName}';
+  String get displayName => displayNameFor(null);
+
+  /// Nom de l'interlocuteur selon le point de vue.
+  /// Un vétérinaire voit le client, un client voit le vétérinaire.
+  String displayNameFor(String? viewerId) {
+    final vetUser = veterinarian?.user;
+    final clientName = client == null ? null : '${client!.firstName} ${client!.lastName}';
+    final vetName = vetUser == null ? null : '${vetUser.firstName} ${vetUser.lastName}';
+
+    if (viewerId != null && vetUser?.id == viewerId) {
+      return clientName ?? 'Conversation';
     }
-    if (client != null) {
-      return '${client!.firstName} ${client!.lastName}';
-    }
-    return 'Conversation';
+    return vetName ?? clientName ?? 'Conversation';
   }
 }
 

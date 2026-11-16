@@ -79,7 +79,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.conversation.displayName, style: const TextStyle(fontSize: 16)),
+            Text(
+              widget.conversation
+                  .displayNameFor(ref.watch(authProvider).user?.id),
+              style: const TextStyle(fontSize: 16),
+            ),
             _wsStatusIndicator(chatState.wsStatus),
           ],
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/conversation.dart';
 import '../models/veterinarian.dart';
+import '../providers/auth_provider.dart';
 import '../providers/conversations_provider.dart';
 import '../theme/app_theme.dart';
 import 'chat_screen.dart';
@@ -104,6 +105,7 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
               final conversation = state.conversations[index];
               return _ConversationCard(
                 conversation: conversation,
+                viewerId: ref.watch(authProvider).user?.id,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => ChatScreen(conversation: conversation)),
@@ -118,8 +120,9 @@ class _ConversationsListScreenState extends ConsumerState<ConversationsListScree
 
 class _ConversationCard extends StatelessWidget {
   final Conversation conversation;
+  final String? viewerId;
   final VoidCallback onTap;
-  const _ConversationCard({required this.conversation, required this.onTap});
+  const _ConversationCard({required this.conversation, this.viewerId, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +135,7 @@ class _ConversationCard extends StatelessWidget {
           child: const Icon(Icons.chat, color: AppColors.primary),
         ),
         title: Text(
-          conversation.displayName,
+          conversation.displayNameFor(viewerId),
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
