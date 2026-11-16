@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/appointment.dart';
 import '../providers/appointments_provider.dart';
+import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/calendar_utils.dart';
 import '../utils/date_utils.dart' as du;
@@ -84,6 +85,10 @@ class _AppointmentsListScreenState extends ConsumerState<AppointmentsListScreen>
               final appointment = state.appointments[index];
               return _AppointmentCard(
                 appointment: appointment,
+                canWithdrawChangeRequest: appointment.hasPendingChangeRequest &&
+                    appointment.clientId ==
+                        ref.watch(authProvider).user?.id,
+                onWithdrawChangeRequest: () => _confirmWithdrawChangeRequest(appointment),
                 onCancel: () => _confirmCancel(appointment),
                 onModify: () => _modify(appointment),
                 onAddToCalendar: () => _addToCalendar(appointment),
@@ -123,6 +128,42 @@ class _AppointmentsListScreenState extends ConsumerState<AppointmentsListScreen>
     }
   }
 
+  Future<void> _confirmWithdrawChangeRequest(Appointment appointment) async {
+    final pending = appointment.pendingChangeRequest;
+    if (pending == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Annuler ma demande'),
+        content: Text(
+          'Voulez-vous annuler votre demande de modification du '
+          '${du.formatDate(pending.proposedStart)} ?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Oui', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final error = await ref
+        .read(appointmentsProvider.notifier)
+        .cancelChangeRequest(pending.id);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error ?? 'Demande de modification annulée'),
+        backgroundColor: error == null ? AppColors.primary : AppColors.error,
+      ),
+    );
+  }
+
   void _confirmCancel(Appointment appointment) {
     showDialog(
       context: context,
@@ -146,13 +187,17 @@ class _AppointmentsListScreenState extends ConsumerState<AppointmentsListScreen>
 
 class _AppointmentCard extends StatelessWidget {
   final Appointment appointment;
+  final bool canWithdrawChangeRequest;
   final VoidCallback onCancel;
   final VoidCallback onModify;
+  final VoidCallback onWithdrawChangeRequest;
   final VoidCallback onAddToCalendar;
   const _AppointmentCard({
     required this.appointment,
+    required this.canWithdrawChangeRequest,
     required this.onCancel,
     required this.onModify,
+    required this.onWithdrawChangeRequest,
     required this.onAddToCalendar,
   });
 
@@ -229,6 +274,19 @@ class _AppointmentCard extends StatelessWidget {
                           style: const TextStyle(fontSize: 12, color: AppColors.primaryDark),
                         ),
                       ),
+                      if (canWithdrawChangeRequest)
+                        TextButton(
+                          onPressed: onWithdrawChangeRequest,
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: const Size(0, 32),
+                          ),
+                          child: const Text(
+                            'Annuler ma demande',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
                     ],
                   ),
                 ),

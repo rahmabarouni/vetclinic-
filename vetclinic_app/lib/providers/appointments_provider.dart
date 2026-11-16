@@ -132,6 +132,27 @@ class AppointmentsNotifier extends StateNotifier<AppointmentsState> {
     }
   }
 
+  /// Annule une demande de modification en attente (côté client).
+  /// Retourne `null` en cas de succès, sinon un message d'erreur.
+  Future<String?> cancelChangeRequest(String id) async {
+    try {
+      await _api.cancelChangeRequest(id);
+      await loadAppointments(page: state.page);
+      return null;
+    } catch (e) {
+      if (e.toString().contains('409')) {
+        return 'Cette demande a déjà été traitée';
+      }
+      if (e.toString().contains('404')) {
+        return 'Demande de modification introuvable';
+      }
+      if (e.toString().contains('403')) {
+        return 'Accès refusé';
+      }
+      return "Erreur lors de l'annulation de la demande";
+    }
+  }
+
   Future<bool> cancelAppointment(String id) async {
     try {
       await _api.cancelAppointment(id);

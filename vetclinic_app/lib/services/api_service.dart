@@ -236,6 +236,10 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<void> cancelChangeRequest(String id) async {
+    await _dio.delete('/api/v1/change-requests/$id');
+  }
+
   Future<Map<String, dynamic>> getChangeRequests({int page = 1, int limit = 20, String? status}) async {
     final queryParams = <String, dynamic>{'page': page, 'limit': limit};
     if (status != null && status.isNotEmpty) queryParams['status'] = status;
