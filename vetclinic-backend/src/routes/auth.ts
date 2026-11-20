@@ -5,14 +5,13 @@ import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import { sendEmail } from "../services/mailer";
 
-const registerSchema = z.object({
+export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  privacyConsent: z.literal(true, {
-    errorMap: () => ({ message: "Le consentement explicite est requis." }),
-  }),
+  // Zod 4 ignore l'ancienne option `errorMap` : le message produit reste celui de z.literal(true).
+  privacyConsent: z.literal(true),
 });
 
 const loginSchema = z.object({
