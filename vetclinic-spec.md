@@ -285,15 +285,20 @@ Utilisateur                 API (Fastify)                    PostgreSQL         
 |---|---|
 | D1 | Code à 6 chiffres (`crypto.randomInt`), validité 15 minutes. |
 | D2 | Stockage de `SHA256(code + ":" + userId)` uniquement ; `attempts Int @default(0)` ; index `userId` conservé ; unicité sur `token` retirée ; anciens tokens supprimés par la migration. |
-| D3 | 5 essais max par code, comparaison en temps constant (`crypto.timingSafeEqual`), message uniforme pour code faux / expiré / épuisé / réutilisé. |
+| D3 | 5 essais max par code, **borne appliquée atomiquement en base** (voir « Concurrence »), comparaison en temps constant (`crypto.timingSafeEqual`), message uniforme pour code faux / expiré / épuisé / réutilisé. |
 | D4 | `forgot-password` : 3 requêtes/min/IP + 3 requêtes/heure/email. `reset-password` : 5 requêtes/min/IP. Dépassement : 429. |
 | D5 | Réponse 200 identique dans tous les cas ; même travail cryptographique des deux côtés ; délai plancher identique de 400 ms (`FORGOT_RESPONSE_FLOOR_MS`), y compris si le mailer échoue. |
 | D6 | Après succès : suppression de tous les codes du user, email de notification. Il n’existe aucun refresh token/session dans le code : les JWT déjà émis ne sont pas révoqués (voir « Points reportés »). |
 | D7 | `newPassword` utilise la même politique que `register` : `z.string().min(8)`, sans règle de complexité supplémentaire. |
 
+**Concurrence (CAS, correctif Phase 2)** : le flux reset utilise deux opérations *compare-and-swap* pour éviter les courses check-then-act détectées par le test de concurrence :
+- **Borne de 5 essais atomique** : `updateMany` avec `{ id, usedAt: null, attempts: { lt: 5 } }` et `increment: 1`. Le SGBD décide de l’incrément, pas un test JavaScript séparé de l’écriture ; les appels surnuméraires reçoivent le message uniforme.
+- **Usage unique atomique** : `bcrypt.hash(..., 12)` est calculé **avant** toute écriture (jamais pour un mauvais code), puis une seule transaction Prisma exécute `updateMany` CAS `{ id, usedAt: null, token: hash, attempts: { lt: 5 } }` → `usedAt = now`, le `user.update(passwordHash)` et le `deleteMany` de tous les codes (D6). Si le CAS échoue (code déjà réservé) ou si une écriture échoue, la transaction est annulée : un seul appel peut aboutir et le code n’est consommé qu’en cas de succès. L’email « Votre mot de passe a été modifié » n’est envoyé qu’après le commit, par la requête gagnante.
+- Vérifié : 20 mauvais codes simultanés → `attempts = 5`, tous 400 ; 10 bons codes simultanés → exactement 1 × 200, 9 × 400, 1 email, 0 code restant ; 10/10 exécutions stables. Écart de latence mesuré entre « email inconnu », « code faux » et « code épuisé » : 7 ms — aucun plancher supplémentaire nécessaire sur `reset-password`.
+
 **Environnement d’envoi** : `MAIL_MODE=dry-run` est prioritaire sur `SMTP_PASS` dans `getMailMode()` ; aucun appel SMTP n’est tenté. En dry-run, les mails sont conservés en mémoire (`sentEmails`) *et* écrits dans `dev-outbox.jsonl` (ignoré par git). Aucun code n’est journalisé : le `[MAIL][DRY-RUN]` n’affiche que destinataire masqué + objet, et `[MAIL][ERROR]` masque le destinataire et toute valeur sensible. `NODE_ENV=production` + `MAIL_MODE=dry-run` refuse le démarrage.
 
-**JWT d’accès (point reporté, hors périmètre)** : `fastify.jwt.sign({ userId, role })` est appelé sans `expiresIn` et sans option globale de signature. La variable `JWT_EXPIRES_IN="7d"` présente dans `.env` n’est **pas lue** par le code. Le JWT n’a donc pas de claim `exp` : la fenêtre résiduelle après un reset dure jusqu’à la fin de vie du token, en pratique illimitée. Corriger ce point toucherait au JWT (intouchable dans cette phase).
+**Points reportés — JWT d’accès (hors périmètre)** : `fastify.jwt.sign({ userId, role })` est appelé sans `expiresIn` et sans option globale de signature. La variable `JWT_EXPIRES_IN="7d"` présente dans `.env` n’est **pas lue** par le code. Le JWT n’a donc pas de claim `exp` : la fenêtre résiduelle après un reset dure jusqu’à la fin de vie du token, en pratique illimitée. Corriger ce point toucherait au JWT (intouchable dans cette phase).
 
 **Procédure de test manuel (développement)** :
 1. Démarrer le backend avec `MAIL_MODE=dry-run` et `MINIO_ENDPOINT=http://localhost:9101`.
