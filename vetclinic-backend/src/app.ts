@@ -26,12 +26,20 @@ import fcmRoutes from "./routes/fcm";
 import dashboardRoutes from "./routes/dashboard";
 import clientsRoutes from "./routes/clients";
 import passwordResetRoutes from "./routes/password-reset";
+import devMailOutboxRoutes from "./routes/dev-mail-outbox";
 import downloadsRoutes from "./routes/downloads";
 import activityRoutes from "./routes/activity";
 import usersRoutes from "./routes/users";
 import searchRoutes from "./routes/search";
 
 export async function buildApp() {
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.MAIL_MODE?.trim().toLowerCase() === "dry-run"
+  ) {
+    throw new Error("Configuration refusée : MAIL_MODE=dry-run est interdit en production.");
+  }
+
   const fastify = Fastify({ logger: false });
 
   // Parser JSON tolérant au corps vide.
@@ -113,6 +121,15 @@ export async function buildApp() {
   await fastify.register(activityRoutes, { prefix: "/api/v1" });
   await fastify.register(usersRoutes, { prefix: "/api/v1" });
   await fastify.register(searchRoutes, { prefix: "/api/v1" });
+
+  // Outbox de dev : montée uniquement en développement ET en dry-run.
+  // Sinon la route n'existe pas (404), y compris en production.
+  if (
+    process.env.NODE_ENV === "development" &&
+    process.env.MAIL_MODE?.trim().toLowerCase() === "dry-run"
+  ) {
+    await fastify.register(devMailOutboxRoutes, { prefix: "/api/v1" });
+  }
 
   fastify.get("/health", async (_request, reply) => {
     const checks: Record<string, { status: string; latencyMs?: number }> = {};

@@ -1,4 +1,5 @@
 import nodemailer, { Transporter } from "nodemailer";
+import { appendToOutbox } from "./dev-outbox";
 
 export type MailMode = "smtp" | "dry-run" | "test";
 
@@ -9,6 +10,25 @@ export interface SendEmailInput {
   html?: string;
   ics?: string;
   icsFilename?: string;
+  /**
+   * Valeurs ne jamais imprimer (code à usage unique, adresse complète...).
+   * Le mail reste écrit intégralement dans l'outbox de dev (fichier ignoré).
+   */
+  sensitiveValues?: string[];
+}
+
+function maskAddress(address: string): string {
+  const at = address.indexOf("@");
+  if (at <= 0) return "<adresse masquee>";
+  return `${address.slice(0, 1)}***@${address.slice(at + 1)}`;
+}
+
+function redact(text: string, secrets: string[]): string {
+  let out = text;
+  for (const secret of secrets) {
+    if (secret && secret.length > 0) out = out.split(secret).join("<REDACTE>");
+  }
+  return out.slice(0, 300);
 }
 
 export interface SentEmailRecord {
@@ -41,6 +61,10 @@ export function isTestEnv(): boolean {
 
 export function getMailMode(): MailMode {
   if (isTestEnv()) return "test";
+  // MAIL_MODE est prioritaire : permet de rester en dry-run sans modifier .env
+  // ni tenter une connexion SMTP quand les identifiants sont invalides.
+  const override = process.env.MAIL_MODE?.trim().toLowerCase();
+  if (override === "dry-run" || override === "smtp") return override;
   if (!process.env.SMTP_PASS || process.env.SMTP_PASS.trim() === "") return "dry-run";
   return "smtp";
 }
@@ -111,7 +135,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     : undefined;
 
   if (mode !== "smtp") {
-    sentEmails.push({
+    const record: SentEmailRecord = {
       at: new Date().toISOString(),
       mode,
       from,
@@ -121,12 +145,17 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       html: input.html,
       ics: input.ics,
       hasIcs,
-    });
+    };
+    sentEmails.push(record);
+    if (mode === "dry-run") appendToOutbox(record);
   }
+
+  const secrets = input.sensitiveValues ?? [];
+  const logRecipient = secrets.length > 0 ? maskAddress(input.to) : input.to;
 
   if (mode === "dry-run") {
     console.log(
-      `[MAIL][DRY-RUN] to=${input.to} subject="${input.subject}" ics=${hasIcs ? "oui" : "non"}`,
+      `[MAIL][DRY-RUN] to=${logRecipient} subject="${input.subject}" ics=${hasIcs ? "oui" : "non"}`,
     );
     return { ok: true, mode };
   }
@@ -144,7 +173,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(
-      `[MAIL][ERROR] to=${input.to} subject="${input.subject}" mode=${mode} error=${reason}`,
+      `[MAIL][ERROR] to=${logRecipient} subject="${input.subject}" mode=${mode} error=${redact(reason, secrets)}`,
     );
     return { ok: false, mode };
   }

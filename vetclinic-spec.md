@@ -247,8 +247,61 @@ vetclinic-backend/
 | POST | `/api/v1/auth/resend-verification` | Auth | Renvoyer un nouveau code OTP |
 | POST | `/api/v1/auth/google` | Public | Connexion/inscription via Google (token idToken, `authProvider: GOOGLE`) |
 | POST | `/api/v1/auth/change-password` | Auth | Changement de mot de passe (requiert mot de passe actuel) |
-| POST | `/api/v1/auth/forgot-password` | Public | Demande de réinitialisation (envoie token) |
-| POST | `/api/v1/auth/reset-password` | Public | Réinitialisation avec token |
+| POST | `/api/v1/auth/forgot-password` | Public | Demande de réinitialisation (envoie un code à 6 chiffres par email) |
+| POST | `/api/v1/auth/reset-password` | Public | Réinitialisation avec `{ email, code, newPassword }` |
+| GET | `/api/v1/dev/mail-outbox` | Public (boucle locale) | Outbox de dev, **uniquement** si `NODE_ENV=development` **et** `MAIL_MODE=dry-run` ; 404 sinon |
+
+> **Changement cassant (Phase 1)** : le format `{ token, newPassword }` de `/auth/reset-password` a été retiré. Les anciens tokens en clair ont été supprimés par la migration `20261119235847_secure_password_reset_code`. Le seul format accepté est désormais `{ email, code, newPassword }`. Aucun consommateur (app Flutter, dashboard, scripts, tests) n’utilisait l’ancien format au moment de la migration.
+
+### Flux « mot de passe oublié » (D1–D7)
+
+```
+Utilisateur                 API (Fastify)                    PostgreSQL              Mailer
+    |  POST /auth/forgot-password { email }
+    |------------------------------>|
+    |                               | 1. lookup user (ou sel fictif)
+    |                               | 2. code = randomInt(0..999999) — 6 chiffres
+    |                               | 3. hash = SHA256(code + ":" + userId)
+    |                               | 4. supprime les codes précédents du user
+    |                               |------------------------------->|
+    |                               | 5. insert hash, expiresAt = now + 15 min
+    |                               |------------------------------->|
+    |                               | 6. sendEmail(code, « expire dans 15 min »)
+    |                               |------------------------------------------>|
+    |  200 générique (toujours identique, plancher 400 ms)  |
+    |<------------------------------|
+    |  POST /auth/reset-password { email, code, newPassword }
+    |------------------------------>|
+    |                               | hash(code + userId) + timingSafeEqual
+    |                               | expiré / 5 essais / déjà utilisé
+    |                               |   => 400 « Code invalide ou expiré. »
+    |                               | bcrypt coût 12 + delete de tous les codes
+    |                               | + email « Votre mot de passe a été modifié »
+    |  200 « Mot de passe réinitialisé avec succès. »
+    |<------------------------------|
+```
+
+| Décision | Contenu |
+|---|---|
+| D1 | Code à 6 chiffres (`crypto.randomInt`), validité 15 minutes. |
+| D2 | Stockage de `SHA256(code + ":" + userId)` uniquement ; `attempts Int @default(0)` ; index `userId` conservé ; unicité sur `token` retirée ; anciens tokens supprimés par la migration. |
+| D3 | 5 essais max par code, comparaison en temps constant (`crypto.timingSafeEqual`), message uniforme pour code faux / expiré / épuisé / réutilisé. |
+| D4 | `forgot-password` : 3 requêtes/min/IP + 3 requêtes/heure/email. `reset-password` : 5 requêtes/min/IP. Dépassement : 429. |
+| D5 | Réponse 200 identique dans tous les cas ; même travail cryptographique des deux côtés ; délai plancher identique de 400 ms (`FORGOT_RESPONSE_FLOOR_MS`), y compris si le mailer échoue. |
+| D6 | Après succès : suppression de tous les codes du user, email de notification. Il n’existe aucun refresh token/session dans le code : les JWT déjà émis ne sont pas révoqués (voir « Points reportés »). |
+| D7 | `newPassword` utilise la même politique que `register` : `z.string().min(8)`, sans règle de complexité supplémentaire. |
+
+**Environnement d’envoi** : `MAIL_MODE=dry-run` est prioritaire sur `SMTP_PASS` dans `getMailMode()` ; aucun appel SMTP n’est tenté. En dry-run, les mails sont conservés en mémoire (`sentEmails`) *et* écrits dans `dev-outbox.jsonl` (ignoré par git). Aucun code n’est journalisé : le `[MAIL][DRY-RUN]` n’affiche que destinataire masqué + objet, et `[MAIL][ERROR]` masque le destinataire et toute valeur sensible. `NODE_ENV=production` + `MAIL_MODE=dry-run` refuse le démarrage.
+
+**JWT d’accès (point reporté, hors périmètre)** : `fastify.jwt.sign({ userId, role })` est appelé sans `expiresIn` et sans option globale de signature. La variable `JWT_EXPIRES_IN="7d"` présente dans `.env` n’est **pas lue** par le code. Le JWT n’a donc pas de claim `exp` : la fenêtre résiduelle après un reset dure jusqu’à la fin de vie du token, en pratique illimitée. Corriger ce point toucherait au JWT (intouchable dans cette phase).
+
+**Procédure de test manuel (développement)** :
+1. Démarrer le backend avec `MAIL_MODE=dry-run` et `MINIO_ENDPOINT=http://localhost:9101`.
+2. `POST /api/v1/auth/forgot-password` avec l’email du compte → 200 générique.
+3. Lire le dernier mail « Réinitialisation… » via `GET /api/v1/dev/mail-outbox` ( ou `dev-outbox.jsonl`) ; le code n’apparaît jamais dans la console.
+4. `POST /api/v1/auth/reset-password` avec `{ email, code, newPassword }` → 200.
+5. Vérifier que l’ancien mot de passe donne 401 au login et le nouveau 200.
+6. Vérifier qu’une 4e demande en 1 minute donne 429, qu’un 6e appel reset en 1 minute donne 429, et que 5 mauvais codes puis le bon code donnent 400.
 
 ### Animaux (Pets)
 

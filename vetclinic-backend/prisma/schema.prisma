@@ -359,19 +359,22 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+/// `token` contient le hash SHA-256 du code à 6 chiffres concaténé à l'userId.
+/// Le code en clair n'est jamais persisté ni journalisé.
 model PasswordResetToken {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
-  token     String   @unique
+  token     String
   expiresAt DateTime @map("expires_at")
   usedAt    DateTime? @map("used_at")
+  attempts  Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
-   @@map("password_reset_tokens")
+  @@map("password_reset_tokens")
 }
 
 model EmailVerificationCode {

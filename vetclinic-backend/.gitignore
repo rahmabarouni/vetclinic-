@@ -22,6 +22,9 @@ dist/
 # Logs
 *.log
 
+# Outbox de developpement (contient des codes a usage unique)
+dev-outbox.jsonl
+
 # Test artifacts
 coverage/
 
