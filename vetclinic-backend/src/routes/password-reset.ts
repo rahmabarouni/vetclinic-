@@ -16,6 +16,14 @@ const DUMMY_USER_ID = "00000000-0000-0000-0000-000000000000";
 const GENERIC_FORGOT_MESSAGE = "Si cet email existe, un code de réinitialisation a été envoyé.";
 const INVALID_CODE_MESSAGE = "Code invalide ou expiré.";
 
+/** Erreur interne : le code a déjà été réservé par une requête concurrente. */
+class ResetClaimConflict extends Error {
+  constructor() {
+    super("reset-claim-conflict");
+    this.name = "ResetClaimConflict";
+  }
+}
+
 /** Limite complémentaire par email (D4) : 3 demandes par heure. */
 const EMAIL_HOURLY_WINDOW_MS = 60 * 60 * 1000;
 const EMAIL_HOURLY_MAX = 3;
@@ -199,20 +207,49 @@ export default async function passwordResetRoutes(fastify: FastifyInstance) {
       }
 
       if (!matches) {
-        await fastify.prisma.passwordResetToken.update({
-          where: { id: record.id },
+        // Borne de 5 essais appliquée par le SGBD, pas par un test en JavaScript :
+        // les appels concurrents qui arrivent après la limite ne comptent plus.
+        const counted = await fastify.prisma.passwordResetToken.updateMany({
+          where: { id: record.id, usedAt: null, attempts: { lt: MAX_CODE_ATTEMPTS } },
           data: { attempts: { increment: 1 } },
         });
+        if (counted.count !== 1) {
+          // Limite déjà atteinte : aucun message distinct n'est exposé.
+          return reply.code(400).send({ error: INVALID_CODE_MESSAGE });
+        }
         return reply.code(400).send({ error: INVALID_CODE_MESSAGE });
       }
 
+      // Hachage coûteux (coût 12) avant toute écriture, jamais pour un mauvais code.
       const passwordHash = await bcrypt.hash(newPassword, 12);
 
-      await fastify.prisma.$transaction([
-        fastify.prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
-        // D6 : tous les codes de l'utilisateur sont supprimés (usage unique).
-        fastify.prisma.passwordResetToken.deleteMany({ where: { userId: user.id } }),
-      ]);
+      try {
+        await fastify.prisma.$transaction(async (tx) => {
+          // CAS : une seule requête peut réserver le code, même sous concurrence.
+          const claimed = await tx.passwordResetToken.updateMany({
+            where: {
+              id: record.id,
+              usedAt: null,
+              token: candidateHash,
+              attempts: { lt: MAX_CODE_ATTEMPTS },
+            },
+            data: { usedAt: new Date() },
+          });
+          if (claimed.count !== 1) {
+            // Erreur interne : annule la transaction ; réponse uniforme ci-dessous.
+            throw new ResetClaimConflict();
+          }
+          await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
+          // D6 : tous les codes de l'utilisateur sont supprimés.
+          await tx.passwordResetToken.deleteMany({ where: { userId: user.id } });
+        });
+      } catch (err) {
+        if (err instanceof ResetClaimConflict) {
+          return reply.code(400).send({ error: INVALID_CODE_MESSAGE });
+        }
+        // Tout autre échec annule déjà la réservation ; on ne consomme pas le code.
+        throw err;
+      }
 
       const sent = await sendEmail({
         to: email,
