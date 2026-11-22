@@ -189,6 +189,34 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Retourne null en cas de succès, sinon le message à afficher.
+  Future<String?> forgotPassword({required String email}) async {
+    try {
+      await _api.forgotPassword(email: email);
+      return null;
+    } catch (e) {
+      return _mapPasswordResetError(e);
+    }
+  }
+
+  /// Retourne null en cas de succès, sinon le message à afficher.
+  Future<String?> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _api.resetPassword(
+        email: email,
+        code: code,
+        newPassword: newPassword,
+      );
+      return null;
+    } catch (e) {
+      return _mapPasswordResetError(e);
+    }
+  }
+
   String _mapVerificationError(Object e) {
     final message = e.toString();
     if (message.contains('400')) return 'Code invalide ou email déjà vérifié';
@@ -200,6 +228,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return 'Impossible de se connecter au serveur';
     }
     return 'Erreur de vérification';
+  }
+
+  String _mapPasswordResetError(Object e) {
+    final message = e.toString();
+    if (message.contains('429')) return 'Trop de demandes, patientez un instant';
+    if (message.contains('400')) return 'Code invalide ou expiré.';
+    if (message.contains('SocketException') ||
+        message.contains('Connection refused')) {
+      return 'Impossible de se connecter au serveur';
+    }
+    return 'Erreur de réinitialisation du mot de passe';
   }
 }
 

@@ -97,6 +97,28 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Demande un code de réinitialisation. La réponse est volontairement générique.
+  Future<String> forgotPassword({required String email}) async {
+    final response = await _dio.post('/api/v1/auth/forgot-password', data: {
+      'email': email,
+    });
+    return (response.data as Map<String, dynamic>)['message'] as String;
+  }
+
+  /// Réinitialise le mot de passe avec le code reçu par email.
+  Future<String> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    final response = await _dio.post('/api/v1/auth/reset-password', data: {
+      'email': email,
+      'code': code,
+      'newPassword': newPassword,
+    });
+    return (response.data as Map<String, dynamic>)['message'] as String;
+  }
+
   Future<Map<String, dynamic>> getProfile() async {
     final response = await _dio.get('/api/v1/users/profile');
     return response.data as Map<String, dynamic>;

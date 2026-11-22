@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -207,7 +208,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     label: const Text('Continuer avec Google'),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ForgotPasswordScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text('Mot de passe oublié ?'),
+                ),
                 TextButton(
                   onPressed: () {
                     Navigator.push(
