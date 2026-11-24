@@ -5,6 +5,7 @@ const isProduction = process.env.NODE_ENV === "production";
 const requiredInProduction = [
   { name: "JWT_SECRET", value: process.env.JWT_SECRET },
   { name: "JWT_EXPIRES_IN", value: process.env.JWT_EXPIRES_IN },
+  { name: "CORS_ORIGIN", value: process.env.CORS_ORIGIN },
   { name: "MINIO_ROOT_USER", value: process.env.MINIO_ROOT_USER },
   { name: "MINIO_ROOT_PASSWORD", value: process.env.MINIO_ROOT_PASSWORD },
 ];

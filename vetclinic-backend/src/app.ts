@@ -33,14 +33,22 @@ import usersRoutes from "./routes/users";
 import searchRoutes from "./routes/search";
 
 export async function buildApp() {
+  const isProduction = process.env.NODE_ENV === "production";
+
   if (
-    process.env.NODE_ENV === "production" &&
+    isProduction &&
     process.env.MAIL_MODE?.trim().toLowerCase() === "dry-run"
   ) {
     throw new Error("Configuration refusée : MAIL_MODE=dry-run est interdit en production.");
   }
 
-  const fastify = Fastify({ logger: false });
+  // Derrière un reverse proxy, l'IP du client est dans X-Forwarded-For.
+  // Sans ce réglage, tous les clients partagent l'IP du proxy et donc les
+  // mêmes compteurs de rate limit.
+  const fastify = Fastify({
+    logger: false,
+    trustProxy: process.env.TRUSTED_PROXY?.trim().toLowerCase() === "true",
+  });
 
   // Parser JSON tolérant au corps vide.
   //
@@ -72,7 +80,16 @@ export async function buildApp() {
     }
   );
 
-  await fastify.register(cors, { origin: true });
+  // En production, seules les origines explicitement configurées sont
+  // acceptées (CORS_ORIGIN séparé par des virgules). En dev, on garde `true`
+  // pour ne pas casser le dashboard local.
+  const allowedOrigins = (process.env.CORS_ORIGIN ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  await fastify.register(cors, {
+    origin: isProduction ? (allowedOrigins.length > 0 ? allowedOrigins : false) : true,
+  });
   await fastify.register(websocket);
   await fastify.register(swagger, {
     openapi: {
