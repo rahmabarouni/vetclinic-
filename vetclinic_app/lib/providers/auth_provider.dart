@@ -3,7 +3,9 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 
 final apiServiceProvider = Provider<ApiService>((ref) {
-  return ApiService();
+  // API_BASE_URL est fourni au build via --dart-define ; sans valeur, on
+  // garde le comportement de développement (10.0.2.2 / localhost).
+  return ApiService(baseUrl: ApiService.configuredBaseUrl);
 });
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }

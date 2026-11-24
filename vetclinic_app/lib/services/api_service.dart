@@ -14,11 +14,29 @@ class ApiService {
           ? 'http://10.0.2.2:3000'
           : 'http://localhost:3000';
 
-  static String get wsBaseUrl => defaultBaseUrl.replaceFirst('http://', 'ws://');
+  /// URL fournie au build :
+  /// `flutter build apk --dart-define=API_BASE_URL=https://api.exemple.tld`
+  static const String _apiBaseUrlFromEnvironment =
+      String.fromEnvironment('API_BASE_URL');
+
+  static String get configuredBaseUrl {
+    const configured = _apiBaseUrlFromEnvironment;
+    return configured.trim().isEmpty ? defaultBaseUrl : configured;
+  }
+
+  static String wsUrlFor(String url) {
+    if (url.startsWith('https://')) return url.replaceFirst('https://', 'wss://');
+    if (url.startsWith('http://')) return url.replaceFirst('http://', 'ws://');
+    return url;
+  }
+
+  static String get wsBaseUrl => wsUrlFor(configuredBaseUrl);
+
+  String get baseUrl => _dio.options.baseUrl;
 
   ApiService({String? baseUrl})
       : _dio = Dio(BaseOptions(
-          baseUrl: baseUrl ?? defaultBaseUrl,
+          baseUrl: baseUrl ?? configuredBaseUrl,
           connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 10),
           headers: {'Content-Type': 'application/json'},
