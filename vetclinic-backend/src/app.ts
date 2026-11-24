@@ -1,6 +1,7 @@
 import "./validate-env";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import multipart from "@fastify/multipart";
@@ -90,6 +91,8 @@ export async function buildApp() {
   await fastify.register(cors, {
     origin: isProduction ? (allowedOrigins.length > 0 ? allowedOrigins : false) : true,
   });
+  // En-têtes de sécurité HTTP (nosniff, frameguard, HSTS...).
+  await fastify.register(helmet);
   await fastify.register(websocket);
   await fastify.register(swagger, {
     openapi: {

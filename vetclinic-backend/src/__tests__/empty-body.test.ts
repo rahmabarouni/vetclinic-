@@ -44,6 +44,13 @@ afterAll(async () => {
 });
 
 describe("Corps JSON vide (parser tolérant)", () => {
+  it("les réponses HTTP portent les en-têtes de sécurité", async () => {
+    const res = await app.inject({ method: "GET", url: "/health" });
+    expect(res.headers["x-content-type-options"]).toBe("nosniff");
+    expect(res.headers["x-frame-options"]).toBe("SAMEORIGIN");
+    expect(res.headers["x-dns-prefetch-control"]).toBe("off");
+  });
+
   it("DELETE /api/v1/pets/:id sans corps et Content-Type JSON — accepté (suppression logique)", async () => {
     const petRes = await app.inject({
       method: "POST",
