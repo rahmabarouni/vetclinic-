@@ -239,7 +239,10 @@ export default async function passwordResetRoutes(fastify: FastifyInstance) {
             // Erreur interne : annule la transaction ; réponse uniforme ci-dessous.
             throw new ResetClaimConflict();
           }
-          await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
+          await tx.user.update({
+            where: { id: user.id },
+            data: { passwordHash, tokenVersion: { increment: 1 } },
+          });
           // D6 : tous les codes de l'utilisateur sont supprimés.
           await tx.passwordResetToken.deleteMany({ where: { userId: user.id } });
         });

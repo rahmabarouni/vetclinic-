@@ -4,6 +4,7 @@ const isProduction = process.env.NODE_ENV === "production";
 
 const requiredInProduction = [
   { name: "JWT_SECRET", value: process.env.JWT_SECRET },
+  { name: "JWT_EXPIRES_IN", value: process.env.JWT_EXPIRES_IN },
   { name: "MINIO_ROOT_USER", value: process.env.MINIO_ROOT_USER },
   { name: "MINIO_ROOT_PASSWORD", value: process.env.MINIO_ROOT_PASSWORD },
 ];
@@ -49,6 +50,16 @@ function readSecret(name: string): string {
 
 export function getJwtSecret(): string {
   return readSecret("JWT_SECRET");
+}
+
+/** Durée de validité d'un JWT, lue depuis JWT_EXPIRES_IN (défaut 7d hors prod). */
+export function getJwtExpiresIn(): string {
+  const value = process.env.JWT_EXPIRES_IN?.trim();
+  if (value) return value;
+  if (isProduction) {
+    throw new Error("JWT_EXPIRES_IN est requis en production.");
+  }
+  return "7d";
 }
 
 export function getMinioUser(): string {

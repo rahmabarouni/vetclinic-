@@ -2,23 +2,32 @@ import fp from "fastify-plugin";
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import jwt from "@fastify/jwt";
 import { UserRole } from "@prisma/client";
-import { getJwtSecret } from "../validate-env";
+import { getJwtExpiresIn, getJwtSecret } from "../validate-env";
 
 export interface JwtPayload {
   userId: string;
   role: UserRole;
+  tokenVersion: number;
 }
 
 export default fp(async (fastify: FastifyInstance) => {
   fastify.register(jwt, {
     secret: getJwtSecret(),
+    sign: { expiresIn: getJwtExpiresIn() },
   });
 
   fastify.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       await request.jwtVerify();
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: request.user.userId },
+        select: { tokenVersion: true },
+      });
+      if (!user || user.tokenVersion !== request.user.tokenVersion) {
+        return reply.code(401).send({ error: "Non authentifié." });
+      }
     } catch (err) {
-      reply.code(401).send({ error: "Non authentifié." });
+      return reply.code(401).send({ error: "Non authentifié." });
     }
   });
 

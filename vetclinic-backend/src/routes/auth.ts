@@ -62,7 +62,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
         role: "CLIENT",
         privacyConsentAt: new Date(),
       },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, tokenVersion: true },
     });
 
     const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
@@ -79,8 +79,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
       html: `<p>Votre code de vérification est : <strong>${verificationCode}</strong></p><p>Ce code expire dans 10 minutes.</p>`,
     });
 
-    const token = fastify.jwt.sign({ userId: user.id, role: user.role });
-    return reply.code(201).send({ user, token, emailVerified: false });
+    const { tokenVersion, ...publicUser } = user;
+    const token = fastify.jwt.sign({ userId: user.id, role: user.role, tokenVersion });
+    return reply.code(201).send({ user: publicUser, token, emailVerified: false });
   });
 
   fastify.post("/auth/login", {
@@ -112,7 +113,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       return reply.code(401).send({ error: "Email ou mot de passe incorrect." });
     }
 
-    const token = fastify.jwt.sign({ userId: user.id, role: user.role });
+    const token = fastify.jwt.sign({ userId: user.id, role: user.role, tokenVersion: user.tokenVersion });
     return reply.send({
       user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
       token,
@@ -221,12 +222,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
             authProvider: "GOOGLE",
             privacyConsentAt: new Date(),
           },
-          select: { id: true, email: true, firstName: true, lastName: true, role: true },
+          select: { id: true, email: true, firstName: true, lastName: true, role: true, tokenVersion: true },
         });
       }
 
-      const token = fastify.jwt.sign({ userId: user.id, role: user.role });
-      return reply.send({ user, token, authProvider: "GOOGLE" });
+      const { tokenVersion, ...publicUser } = user;
+      const token = fastify.jwt.sign({ userId: user.id, role: user.role, tokenVersion });
+      return reply.send({ user: publicUser, token, authProvider: "GOOGLE" });
     }
   );
 }

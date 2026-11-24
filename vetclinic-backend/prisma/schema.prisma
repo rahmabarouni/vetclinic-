@@ -31,6 +31,7 @@ model User {
   isActive            Boolean        @default(true) @map("is_active")
   emailVerified       Boolean        @default(false) @map("email_verified")
   authProvider        AuthProvider   @default(LOCAL) @map("auth_provider")
+  tokenVersion        Int            @default(0) @map("token_version")
   privacyConsentAt    DateTime?      @map("privacy_consent_at")
   fcmToken            String?        @map("fcm_token")
   createdAt           DateTime       @default(now()) @map("created_at")
