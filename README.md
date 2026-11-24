@@ -114,12 +114,39 @@ En production, placer le serveur derrière un **reverse proxy** (Nginx ou Caddy)
 - **Caddy** : terminates TLS automatiquement avec Let's Encrypt
 - **Nginx** : utiliser Certbot pour obtenir un certificat, configurer `proxy_pass`
 
-Variables d'environnement requises en prod :
+Variables d'environnement requises en prod (les valeurs ne doivent **jamais**
+être commitées — elles sont fournies par l'environnement d'hébergement) :
 
 | Variable | Description |
 |---|---|
 | `NODE_ENV=production` | Active le mode production |
+| `DATABASE_URL` | URL PostgreSQL de production |
+| `JWT_SECRET` | Secret de signature JWT |
+| `JWT_EXPIRES_IN` | Durée de validité des JWT (ex. `7d`) |
+| `CORS_ORIGIN` | Origines autorisées, séparées par des virgules |
 | `TRUSTED_PROXY=true` | Indique que le serveur est derrière un reverse proxy TLS |
+| `MINIO_ENDPOINT`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | Stockage objet |
+| `MAIL_MODE=smtp` + `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Envoi d'emails réel (obligatoire : `dry-run` refuse le démarrage en prod) |
+
+### Checklist avant mise en production
+
+1. `cd vetclinic-backend && npx prisma migrate deploy` — **jamais** `prisma db seed` :
+   le seed est refusé en production depuis la Phase 4 (aucun compte de démonstration).
+2. Vérifier que `/docs` renvoie 404 et que `/health` n'expose pas `memory`.
+3. Vérifier que `TRUSTED_PROXY=true` correspond bien à un déploiement derrière
+   un proxy : les rate limits utilisent alors `X-Forwarded-For`.
+4. Tester l'envoi d'email avec `npm run mail:test` (sans afficher les identifiants).
+5. Builder l'app Flutter avec l'URL de l'API de production :
+
+   ```bash
+   flutter build apk --dart-define=API_BASE_URL=https://api.votre-domaine.tld
+   ```
+
+   Sans ce `--dart-define`, l'app garde `10.0.2.2:3000` (Android) / `localhost:3000`
+   et ne peut pas joindre la production. La WebSocket suit automatiquement le
+   même host (`wss://` si l'API est en `https://`).
+6. La CI (`.github/workflows/ci.yml`) rejoue `npm test`, `npm run build`,
+   `flutter analyze` et `flutter test` sur chaque push / PR.
 
 ### Chiffrement au repos
 
