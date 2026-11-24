@@ -111,7 +111,10 @@ export async function buildApp() {
       security: [{ bearerAuth: [] }],
     },
   });
-  await fastify.register(swaggerUi, { routePrefix: "/docs" });
+  // La doc interactive n'est pas exposée publiquement en production.
+  if (!isProduction) {
+    await fastify.register(swaggerUi, { routePrefix: "/docs" });
+  }
   await fastify.register(prismaPlugin);
   await fastify.register(authPlugin);
   await fastify.register(minioPlugin);
@@ -171,17 +174,22 @@ export async function buildApp() {
     const mem = process.memoryUsage();
     const allOk = Object.values(checks).every((c) => c.status === "ok");
 
-    return reply.code(allOk ? 200 : 503).send({
+    const body: Record<string, unknown> = {
       status: allOk ? "ok" : "degraded",
       uptime: Math.floor(process.uptime()),
-      memory: {
+      checks,
+    };
+    // Les détails mémoire ne sont exposés qu'en développement.
+    if (!isProduction) {
+      body.memory = {
         rss: `${(mem.rss / 1024 / 1024).toFixed(1)} MB`,
         heapUsed: `${(mem.heapUsed / 1024 / 1024).toFixed(1)} MB`,
         heapTotal: `${(mem.heapTotal / 1024 / 1024).toFixed(1)} MB`,
         external: `${(mem.external / 1024 / 1024).toFixed(1)} MB`,
-      },
-      checks,
-    });
+      };
+    }
+
+    return reply.code(allOk ? 200 : 503).send(body);
   });
 
   return fastify;
