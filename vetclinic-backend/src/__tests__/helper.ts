@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { buildApp } from "../app";
 
 const prisma = new PrismaClient();
@@ -10,22 +10,28 @@ let app: FastifyInstance;
 
 export { prisma };
 
-const SUITE_ADMIN_EMAIL = "suite-admin@test.com";
+/**
+ * Comptes ADMIN éphémères créés par getAdminToken. Un email distinct par
+ * appel évite qu'un fichier de test exécuté en parallèle écrase le hash de
+ * mot de passe d'un autre (les suites Vitest tournent dans des workers
+ * séparés mais partagent la même base).
+ */
+const adminEmails = new Set<string>();
 
 /**
  * Fournit un token ADMIN pour les tests, sans dépendre d'un mot de passe
- * versionné ni des données de seed. Un compte de test dédié est créé/mis à
- * jour avec un mot de passe aléatoire propre à l'exécution.
+ * versionné ni des données de seed. Un compte de test dédié est créé avec un
+ * mot de passe aléatoire propre à l'exécution.
  */
 export async function getAdminToken(app: FastifyInstance): Promise<string> {
+  const email = `suite-admin-${randomUUID().slice(0, 8)}@test.com`;
+  adminEmails.add(email);
   const password = randomBytes(18).toString("base64url");
   const passwordHash = await bcrypt.hash(password, 10);
 
-  await prisma.user.upsert({
-    where: { email: SUITE_ADMIN_EMAIL },
-    update: { passwordHash, role: "ADMIN", isActive: true },
-    create: {
-      email: SUITE_ADMIN_EMAIL,
+  await prisma.user.create({
+    data: {
+      email,
       passwordHash,
       firstName: "Suite",
       lastName: "Admin",
@@ -38,7 +44,8 @@ export async function getAdminToken(app: FastifyInstance): Promise<string> {
   const login = await app.inject({
     method: "POST",
     url: "/api/v1/auth/login",
-    payload: { email: SUITE_ADMIN_EMAIL, password },
+    remoteAddress: `127.${(adminEmails.size % 250) + 1}.0.1`,
+    payload: { email, password },
   });
 
   if (login.statusCode !== 200) {
@@ -60,6 +67,10 @@ export async function closeApp(): Promise<void> {
   if (app) {
     await app.close();
     app = undefined as any;
+  }
+  if (adminEmails.size > 0) {
+    await prisma.user.deleteMany({ where: { email: { in: [...adminEmails] } } });
+    adminEmails.clear();
   }
   await prisma.$disconnect();
 }
