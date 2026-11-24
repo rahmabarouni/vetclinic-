@@ -48,13 +48,14 @@ function printRecap(
 }
 
 async function main() {
+  // Les comptes de démonstration ne doivent jamais exister en production,
+  // même si SEED_PASSWORD est fourni : uniquement les migrations en prod.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Le seed de démonstration est interdit en production.");
+  }
+
   const seedPassword = process.env.SEED_PASSWORD?.trim();
   const generatedPassword = !seedPassword;
-  if (process.env.NODE_ENV === "production" && generatedPassword) {
-    throw new Error(
-      "SEED_PASSWORD est requis pour exécuter le seed en production (aucun mot de passe par défaut n'est fourni).",
-    );
-  }
   // Aucun mot de passe de démonstration n'est stocké dans le dépôt :
   // soit SEED_PASSWORD est fourni, soit un mot de passe aléatoire est généré
   // et affiché une seule fois à la fin du seed.
